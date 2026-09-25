@@ -681,12 +681,40 @@ int unmatched( const std::vector< Seen >& a, const std::vector< Seen >& b, doubl
 	return n;
 }
 
+/// The worst any bridge of the last frame is longer than the brute-force
+/// shortest gap of its pass (texels).
+double worstExcess( const Stencil& p )
+{
+	const bridge::Result& r = p.CutForTest( 1 );
+	const int gw            = p.LatticeWidthForTest() + 2;
+	const int gh            = p.LatticeHeightForTest() + 2;
+	double worst            = 0.0;
+	for( size_t pass = 0; pass < r.snapshots.size(); ++pass )
+	{
+		const std::vector< uint8_t > sheet = sheetOfCells( r.snapshots[ pass ] );
+		const reference::Pieces pieces     = reference::label( sheet, gw, gh );
+		for( const bridge::Bridge& b : r.bridges )
+		{
+			if( b.pass != static_cast< int >( pass ) + 1 )
+				continue;
+			const int ia = pieces.piece[ static_cast< size_t >( b.ay ) * gw + b.ax ];
+			if( ia < 0 )
+				return 1e9;
+			bool brute = false;
+			worst      = std::max( worst, b.length - reference::shortestGap( pieces, sheet, ia, brute ) );
+		}
+	}
+	return worst;
+}
+
 double churnOf( int width, int height, fixtures::PanCache& pictures, int perturb, int frames, double pxPerFrame,
-                int& changedFrames, int& total )
+                int& changedFrames, int& total, double& excess )
 {
 	Session s;
 	baseline( s.plugin );
 	s.plugin.SetPerturbForTest( perturb );
+	s.plugin.SetRecordForTest( true );
+	excess = 0.0;
 	if( !s.begin( width, height ) )
 		return -1.0;
 	const double texel = static_cast< double >( s.plugin.LatticeScale( height ) ) / height;
@@ -699,6 +727,10 @@ double churnOf( int width, int height, fixtures::PanCache& pictures, int perturb
 		const double pan = f * pxPerFrame / height;
 		s.render( pictures.at( f * pxPerFrame ) );
 		const std::vector< Seen > now = bridgesOf( s.plugin, pan, height );
+		//Every tenth frame, the kept bridges against brute force: keeping
+		//one is allowed to cost at most Stencil::kKeepSlack.
+		if( f % 10 == 9 )
+			excess = std::max( excess, worstExcess( s.plugin ) );
 		if( f > 0 )
 		{
 			const int m = unmatched( now, previous, 1.5 * texel ) + unmatched( previous, now, 1.5 * texel );
@@ -777,14 +809,21 @@ void runChurn( int width, int height, int perturb, bool quiet )
 	for( int which : { fixtures::kLetters, fixtures::kNested, fixtures::kBlobs } )
 	{
 		int changedKept = 0, totalKept = 0, changedFree = 0, totalFree = 0;
+		double excessKept = 0.0, excessFree = 0.0;
 		fixtures::PanCache pictures( width, height, which, static_cast< int >( std::ceil( speed * frames ) ) + 2 );
-		const double kept = churnOf( width, height, pictures, perturb, frames, speed, changedKept, totalKept );
-		const double free = churnOf( width, height, pictures, perturb | bridge::kPerturbNoHistory, frames, speed, changedFree, totalFree );
-		const bool ok     = kept >= 0.0 && free > 0.0 && kept < free;
+		const double kept = churnOf( width, height, pictures, perturb, frames, speed, changedKept, totalKept, excessKept );
+		const double free = churnOf( width, height, pictures, perturb | bridge::kPerturbNoHistory, frames, speed, changedFree,
+		                             totalFree, excessFree );
+		//A kept bridge may be kKeepSlack longer than the shortest by design;
+		//a fresh one, by the spec's allowance, one texel.
+		const bool ok = kept >= 0.0 && free > 0.0 && kept < free && excessKept <= Stencil::kKeepSlack + 1.0 + 1e-9
+		                && excessFree <= 1.0 + 1e-9;
 		report( ok, quiet,
 		        "churn: %-18s panned %.1f px a frame for %d frames: churn %.2f%% of bridge-frames (%d frames changed) "
-		        "keeping last frame's bridges, %.2f%% (%d frames) without",
-		        fixtures::Name( which ), speed, frames, 100.0 * kept, changedKept, 100.0 * free, changedFree );
+		        "keeping last frame's bridges, %.2f%% (%d frames) without; worst bridge over the brute-force shortest "
+		        "%.3f texels kept (allowed %.0f), %.3f not (allowed 1)",
+		        fixtures::Name( which ), speed, frames, 100.0 * kept, changedKept, 100.0 * free, changedFree, excessKept,
+		        Stencil::kKeepSlack + 1.0, excessFree );
 	}
 }
 
