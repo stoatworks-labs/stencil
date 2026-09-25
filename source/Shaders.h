@@ -17,14 +17,16 @@
 	   wall and never a hole.
 	2. **blur** -- lattice, RGBA16F, x then y, only when Smooth is up.
 	   Read back: the CPU cuts each layer from the tone.
-	3. **seed** -- grid, RGBA16UI, from the pieces' labels (R32UI, uploaded
+	3. **seed** -- grid, RGBA32UI, from the pieces' labels (R32UI, uploaded
 	   by the CPU): every sheet texel its own nearest sheet, nothing yet of
-	   another piece.
-	4. **flood** -- grid, RGBA16UI, ping-ponged: 1+JFA and a finish, as
+	   another piece. A seed is (position, piece), so the flood carries the
+	   labels with it and never looks one up.
+	4. **flood** -- grid, RGBA32UI, ping-ponged: 1+JFA and a finish, as
 	   toolpath's. Each texel carries TWO seeds: its nearest sheet texel, and
 	   its nearest sheet texel of a DIFFERENT piece. For a sheet texel the
 	   second is the nearest texel of another piece, which is what a bridge
-	   is. Read back.
+	   is. **second** then writes the second's position alone (R32UI), and
+	   that is read back.
 	5. **spray** -- lattice, RGBA16F, one layer a channel: the hole mask
 	   (the CPU's cut, uploaded as RGBA8: 0 sheet, 0.5 bridge, 1 hole)
 	   gathered through the cone's footprint (Spray.h), exact square-disc
@@ -48,11 +50,13 @@ std::string Detect();
 std::string Blur();
 std::string Seed();
 std::string Flood();
+std::string Second();
 std::string Spray();
 std::string Settle();
 std::string Composite();
 
-/// Value the flood stores for "no seed of this kind yet".
-constexpr unsigned kNoSeed = 65535u;
+/// Value the flood stores for "no seed of this kind yet": a seed is a
+/// position packed x | y << 16.
+constexpr unsigned kNoSeed = 0xffffffffu;
 
 } // namespace stencil::shaders

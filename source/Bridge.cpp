@@ -15,9 +15,7 @@ double millisSince( std::chrono::steady_clock::time_point start )
 	return std::chrono::duration< double, std::milli >( std::chrono::steady_clock::now() - start ).count();
 }
 
-/// Union-find over cell indices, path halving, union by index (the smaller
-/// root wins, so a piece's root is its lowest cell in raster order and the
-/// labels do not depend on the order the unions happened in).
+/// Union-find with path halving, union by index (the smaller root wins).
 struct Forest
 {
 	std::vector< int32_t > parent;
@@ -50,21 +48,82 @@ struct Forest
 	}
 };
 
-void build( const Grid& grid, Forest& forest )
+/**
+	Label the sheet by RUNS: each row's maximal stretches of sheet are the
+	nodes, and a run is united with every run of the row below whose x range
+	overlaps its own (4-connectivity: sharing a column, not a corner). There
+	are tens of times fewer runs than cells, which is what makes this cheap
+	enough to redo every pass. Runs are numbered in raster order and the
+	smaller root wins, so a piece's root is its first run, and its label is
+	the index of that run's first cell plus one: the lowest cell of the piece
+	in raster order, whatever order the unions happened in.
+*/
+struct Runs
 {
-	forest.reset( grid.cells.size() );
-	for( int y = 0; y < grid.height; ++y )
-		for( int x = 0; x < grid.width; ++x )
+	struct Run
+	{
+		int32_t row, x0, x1;//x1 inclusive
+	};
+	std::vector< Run > runs;
+	std::vector< int32_t > rowStart;//runs of row y are [rowStart[y], rowStart[y + 1])
+	Forest forest;
+
+	void build( const Grid& grid )
+	{
+		runs.clear();
+		rowStart.assign( static_cast< size_t >( grid.height ) + 1, 0 );
+		for( int y = 0; y < grid.height; ++y )
 		{
-			if( !IsSheet( grid.at( x, y ) ) )
-				continue;
-			const int32_t i = y * grid.width + x;
-			if( x > 0 && IsSheet( grid.at( x - 1, y ) ) )
-				forest.unite( i, i - 1 );
-			if( y > 0 && IsSheet( grid.at( x, y - 1 ) ) )
-				forest.unite( i, i - grid.width );
+			rowStart[ static_cast< size_t >( y ) ] = static_cast< int32_t >( runs.size() );
+			const uint8_t* row = grid.cells.data() + static_cast< size_t >( y ) * grid.width;
+			int x              = 0;
+			while( x < grid.width )
+			{
+				while( x < grid.width && !IsSheet( row[ x ] ) )
+					++x;
+				if( x >= grid.width )
+					break;
+				const int x0 = x;
+				while( x < grid.width && IsSheet( row[ x ] ) )
+					++x;
+				runs.push_back( { y, x0, x - 1 } );
+			}
 		}
-}
+		rowStart[ static_cast< size_t >( grid.height ) ] = static_cast< int32_t >( runs.size() );
+
+		forest.reset( runs.size() );
+		for( int y = 1; y < grid.height; ++y )
+		{
+			int32_t below     = rowStart[ static_cast< size_t >( y - 1 ) ];
+			const int32_t end = rowStart[ static_cast< size_t >( y ) ];
+			for( int32_t r = rowStart[ static_cast< size_t >( y ) ]; r < rowStart[ static_cast< size_t >( y ) + 1 ]; ++r )
+			{
+				//Skip the runs below that end before this one starts; unite
+				//with every one that overlaps it.
+				while( below < end && runs[ static_cast< size_t >( below ) ].x1 < runs[ static_cast< size_t >( r ) ].x0 )
+					++below;
+				for( int32_t b = below; b < end && runs[ static_cast< size_t >( b ) ].x0 <= runs[ static_cast< size_t >( r ) ].x1; ++b )
+					forest.unite( r, b );
+			}
+		}
+	}
+
+	/// Every cell's label (0 for hole), and the margin's.
+	void fill( const Grid& grid, std::vector< uint32_t >& labels, uint32_t& anchor )
+	{
+		labels.assign( grid.cells.size(), 0u );
+		for( size_t r = 0; r < runs.size(); ++r )
+		{
+			const Run& root   = runs[ static_cast< size_t >( forest.find( static_cast< int32_t >( r ) ) ) ];
+			const uint32_t id = static_cast< uint32_t >( root.row ) * static_cast< uint32_t >( grid.width ) + static_cast< uint32_t >( root.x0 ) + 1u;
+			const Run& run    = runs[ r ];
+			std::fill( labels.begin() + static_cast< long >( static_cast< size_t >( run.row ) * grid.width + run.x0 ),
+			           labels.begin() + static_cast< long >( static_cast< size_t >( run.row ) * grid.width + run.x1 + 1 ), id );
+		}
+		//Cell 0 is a corner of the margin, always sheet, always the first run.
+		anchor = labels.empty() ? 0u : labels[ 0 ];
+	}
+};
 
 /// A candidate bridge's order: shortest, then the lowest a in raster order,
 /// then the lowest b. `tie` is 0 unless a perturbation puts something first.
@@ -140,13 +199,9 @@ void Band( int ax, int ay, int bx, int by, double width, int perturb, int gridWi
 
 void Label( const Grid& grid, std::vector< uint32_t >& labels, uint32_t& anchor )
 {
-	Forest forest;
-	build( grid, forest );
-	labels.assign( grid.cells.size(), 0u );
-	for( size_t i = 0; i < grid.cells.size(); ++i )
-		if( IsSheet( grid.cells[ i ] ) )
-			labels[ i ] = static_cast< uint32_t >( forest.find( static_cast< int32_t >( i ) ) ) + 1u;
-	anchor = static_cast< uint32_t >( forest.find( 0 ) ) + 1u;
+	Runs runs;
+	runs.build( grid );
+	runs.fill( grid, labels, anchor );
 }
 
 Result Cut( Grid& grid, const Settings& settings, const std::vector< Bridge >& history, const Flood& flood, bool record )
@@ -165,26 +220,31 @@ Result Cut( Grid& grid, const Settings& settings, const std::vector< Bridge >& h
 	for( int y = 0; y < h; ++y )
 		grid.at( 0, y ) = grid.at( w - 1, y ) = kSheet;
 
-	Forest forest;
-	build( grid, forest );
+	std::vector< uint32_t > labels;
+	uint32_t anchor = 0;
+	Runs runs;
+	auto relabel = [ & ]() {
+		runs.build( grid );
+		runs.fill( grid, labels, anchor );
+	};
+	relabel();
 
 	//--- drop the specks -----------------------------------------------------
 	{
-		std::vector< int32_t > size( cells, 0 );
-		for( size_t i = 0; i < cells; ++i )
-			if( IsSheet( grid.cells[ i ] ) )
-				++size[ static_cast< size_t >( forest.find( static_cast< int32_t >( i ) ) ) ];
-		const int32_t anchor = forest.find( 0 );
-		bool any             = false;
-		for( size_t i = 0; i < cells; ++i )
+		std::vector< int64_t > size( runs.runs.size(), 0 );
+		for( size_t r = 0; r < runs.runs.size(); ++r )
+			size[ static_cast< size_t >( runs.forest.find( static_cast< int32_t >( r ) ) ) ] += runs.runs[ r ].x1 - runs.runs[ r ].x0 + 1;
+		const int32_t held = runs.forest.find( 0 );
+		std::vector< uint8_t > drop( runs.runs.size(), 0 );
+		bool any = false;
+		for( size_t r = 0; r < runs.runs.size(); ++r )
 		{
-			if( static_cast< int32_t >( i ) != forest.find( static_cast< int32_t >( i ) ) || size[ i ] == 0
-			    || static_cast< int32_t >( i ) == anchor )
+			if( runs.forest.find( static_cast< int32_t >( r ) ) != static_cast< int32_t >( r ) || static_cast< int32_t >( r ) == held )
 				continue;
-			if( static_cast< double >( size[ i ] ) < settings.minIslandArea )
+			if( static_cast< double >( size[ r ] ) < settings.minIslandArea )
 			{
 				++result.dropped;
-				size[ i ] = -1;//marked
+				drop[ r ] = 1;
 				any       = true;
 			}
 			else
@@ -192,43 +252,44 @@ Result Cut( Grid& grid, const Settings& settings, const std::vector< Bridge >& h
 		}
 		if( any )
 		{
-			for( size_t i = 0; i < cells; ++i )
-				if( IsSheet( grid.cells[ i ] ) && size[ static_cast< size_t >( forest.find( static_cast< int32_t >( i ) ) ) ] < 0 )
-					grid.cells[ i ] = kHole;
-			build( grid, forest );
+			for( size_t r = 0; r < runs.runs.size(); ++r )
+				if( drop[ static_cast< size_t >( runs.forest.find( static_cast< int32_t >( r ) ) ) ] )
+				{
+					const Runs::Run& run = runs.runs[ r ];
+					std::fill( grid.cells.begin() + static_cast< long >( static_cast< size_t >( run.row ) * w + run.x0 ),
+					           grid.cells.begin() + static_cast< long >( static_cast< size_t >( run.row ) * w + run.x1 + 1 ), kHole );
+				}
+			relabel();
 		}
 	}
 
-	std::vector< uint32_t > labels( cells );
-	std::vector< uint16_t > second;
+	std::vector< uint32_t > second;
 	std::vector< std::pair< int, int > > band;
-	//Floating pieces are numbered densely each pass, so the per-piece arrays
-	//are as long as there are pieces, not cells.
+	//Floating pieces are numbered densely each pass (by label - 1), so the
+	//per-piece arrays are as long as there are pieces, not cells.
 	std::vector< int32_t > dense( cells, -1 );
-	std::vector< int32_t > roots;
+	std::vector< uint32_t > roots;//the floating pieces' labels
 	std::vector< Key > best, kept;
 	std::vector< int64_t > keptMoved;
+	Forest joined;//this pass's merges, over dense ids and the margin
 
 	for( int pass = 1; pass <= settings.maxPasses; ++pass )
 	{
-		const int32_t anchor = forest.find( 0 );
-		for( int32_t r : roots )
-			dense[ static_cast< size_t >( r ) ] = -1;
+		if( pass > 1 )
+			relabel();
+		for( uint32_t l : roots )
+			dense[ l - 1u ] = -1;
 		roots.clear();
-		for( size_t i = 0; i < cells; ++i )
+		for( size_t r = 0; r < runs.runs.size(); ++r )
 		{
-			if( IsSheet( grid.cells[ i ] ) )
-			{
-				const int32_t r = forest.find( static_cast< int32_t >( i ) );
-				labels[ i ]     = static_cast< uint32_t >( r ) + 1u;
-				if( r != anchor && dense[ static_cast< size_t >( r ) ] < 0 )
-				{
-					dense[ static_cast< size_t >( r ) ] = static_cast< int32_t >( roots.size() );
-					roots.push_back( r );
-				}
-			}
-			else
-				labels[ i ] = 0u;
+			if( runs.forest.find( static_cast< int32_t >( r ) ) != static_cast< int32_t >( r ) )
+				continue;
+			const Runs::Run& run = runs.runs[ r ];
+			const uint32_t l     = static_cast< uint32_t >( run.row ) * static_cast< uint32_t >( w ) + static_cast< uint32_t >( run.x0 ) + 1u;
+			if( l == anchor )
+				continue;
+			dense[ l - 1u ] = static_cast< int32_t >( roots.size() );
+			roots.push_back( l );
 		}
 		if( roots.empty() || ( settings.perturb & kPerturbNoBridges ) )
 			break;
@@ -268,7 +329,7 @@ Result Cut( Grid& grid, const Settings& settings, const std::vector< Bridge >& h
 				for( int y = topY[ d ] + 1; y < h; ++y )
 				{
 					const uint32_t l = labels[ static_cast< size_t >( y ) * w + x ];
-					if( l != 0 && l != static_cast< uint32_t >( roots[ d ] ) + 1u )
+					if( l != 0 && l != roots[ d ] )
 					{
 						best[ d ] = keyFor( x, topY[ d ], x, y, grid, 0 );
 						break;
@@ -278,10 +339,63 @@ Result Cut( Grid& grid, const Settings& settings, const std::vector< Bridge >& h
 		}
 		else
 		{
+			//The region: the whole grid on the first pass; after it, the box
+			//round every floating piece grown by the shortest bridge the last
+			//flood already offers it to a piece it is not part of now. If any
+			//piece has none, the whole grid again.
+			Region region{ 0, 0, w, h };
+			if( pass > 1 && second.size() == cells )
+			{
+				const size_t n = roots.size();
+				std::vector< int > x0( n, w ), y0( n, h ), x1( n, -1 ), y1( n, -1 );
+				std::vector< int64_t > reach( n, std::numeric_limits< int64_t >::max() );
+				for( int y = 1; y < h - 1; ++y )
+					for( int x = 1; x < w - 1; ++x )
+					{
+						const size_t i  = static_cast< size_t >( y ) * w + x;
+						const int32_t d = pieceOf( i );
+						if( d < 0 )
+							continue;
+						x0[ d ] = std::min( x0[ d ], x );
+						y0[ d ] = std::min( y0[ d ], y );
+						x1[ d ] = std::max( x1[ d ], x );
+						y1[ d ] = std::max( y1[ d ], y );
+						const uint32_t packed = second[ i ];
+						if( packed == kNone )
+							continue;
+						const int sx = static_cast< int >( packed & 0xffffu ), sy = static_cast< int >( packed >> 16 );
+						if( sx >= w || sy >= h )
+							continue;
+						const uint32_t other = labels[ static_cast< size_t >( sy ) * w + sx ];
+						if( other == 0 || other == labels[ i ] )
+							continue;
+						const int64_t dx = sx - x, dy = sy - y;
+						reach[ d ]       = std::min( reach[ d ], dx * dx + dy * dy );
+					}
+				bool bounded = n > 0;
+				Region box{ w, h, 0, 0 };
+				for( size_t d = 0; d < n && bounded; ++d )
+				{
+					if( reach[ d ] == std::numeric_limits< int64_t >::max() )
+					{
+						bounded = false;
+						break;
+					}
+					const int grow = static_cast< int >( std::ceil( std::sqrt( static_cast< double >( reach[ d ] ) ) ) ) + 1;
+					box.x0         = std::min( box.x0, std::max( 0, x0[ d ] - grow ) );
+					box.y0         = std::min( box.y0, std::max( 0, y0[ d ] - grow ) );
+					box.x1         = std::max( box.x1, std::min( w, x1[ d ] + grow + 1 ) );
+					box.y1         = std::max( box.y1, std::min( h, y1[ d ] + grow + 1 ) );
+				}
+				if( bounded )
+					region = box;
+			}
+			result.regionCells += static_cast< int64_t >( region.x1 - region.x0 ) * ( region.y1 - region.y0 );
+
 			const auto floodStart = std::chrono::steady_clock::now();
-			const bool ok         = flood( labels, w, h, second );
+			const bool ok         = flood( labels, w, h, region, second );
 			result.floodMillis += millisSince( floodStart );
-			if( !ok || second.size() != cells * 2 )
+			if( !ok || second.size() != cells )
 			{
 				result.floatingLeft = -1;
 				break;
@@ -294,9 +408,10 @@ Result Cut( Grid& grid, const Settings& settings, const std::vector< Bridge >& h
 					const int32_t d = pieceOf( i );
 					if( d < 0 )
 						continue;
-					const uint16_t sx = second[ 2 * i ], sy = second[ 2 * i + 1 ];
-					if( sx == kNone || sy == kNone )
+					const uint32_t packed = second[ i ];
+					if( packed == kNone )
 						continue;
+					const int sx = static_cast< int >( packed & 0xffffu ), sy = static_cast< int >( packed >> 16 );
 					const Key k = keyFor( x, y, sx, sy, grid, settings.perturb );
 					if( k < best[ static_cast< size_t >( d ) ] )
 						best[ static_cast< size_t >( d ) ] = k;
@@ -323,9 +438,12 @@ Result Cut( Grid& grid, const Settings& settings, const std::vector< Bridge >& h
 								const int32_t d = pieceOf( i );
 								if( d < 0 || !best[ static_cast< size_t >( d ) ].valid() )
 									continue;
-								const uint16_t sx = second[ 2 * i ], sy = second[ 2 * i + 1 ];
-								if( sx == kNone || sy == kNone )
+								if( x < region.x0 || y < region.y0 || x >= region.x1 || y >= region.y1 )
 									continue;
+								const uint32_t packed = second[ i ];
+								if( packed == kNone )
+									continue;
+								const int sx = static_cast< int >( packed & 0xffffu ), sy = static_cast< int >( packed >> 16 );
 								const Key k = keyFor( x, y, sx, sy, grid, settings.perturb );
 								if( std::sqrt( static_cast< double >( k.length2 ) )
 								    > std::sqrt( static_cast< double >( best[ static_cast< size_t >( d ) ].length2 ) ) + settings.keepSlack + 1e-9 )
@@ -356,7 +474,7 @@ Result Cut( Grid& grid, const Settings& settings, const std::vector< Bridge >& h
 		{
 			if( !best[ d ].valid() )
 				continue;
-			Choice c{ best[ d ], static_cast< uint32_t >( roots[ d ] ) + 1u, false };
+			Choice c{ best[ d ], roots[ d ], false };
 			if( kept[ d ].valid() )
 			{
 				c.key  = kept[ d ];
@@ -372,32 +490,38 @@ Result Cut( Grid& grid, const Settings& settings, const std::vector< Bridge >& h
 			return a.key < b.key;
 		} );
 
+		const int32_t margin = static_cast< int32_t >( roots.size() );
+		joined.reset( roots.size() + 1 );
+		auto idOf = [ & ]( uint32_t l ) -> int32_t { return l == anchor ? margin : dense[ l - 1u ]; };
 		for( const Choice& c : choices )
 		{
-			const int32_t ia = c.key.ay * w + c.key.ax;
-			const int32_t ib = c.key.by * w + c.key.bx;
-			//Already joined this pass: the other side's bridge did it.
-			if( forest.find( ia ) == forest.find( ib ) )
+			const uint32_t la = labels[ static_cast< size_t >( c.key.ay ) * w + c.key.ax ];
+			const uint32_t lb = labels[ static_cast< size_t >( c.key.by ) * w + c.key.bx ];
+			if( la == 0 || lb == 0 )
 				continue;
+			const int32_t ia = idOf( la ), ib = idOf( lb );
+			//Already joined this pass: the other side's bridge did it.
+			if( joined.find( ia ) == joined.find( ib ) )
+				continue;
+			joined.unite( ia, ib );
 			Band( c.key.ax, c.key.ay, c.key.bx, c.key.by, settings.width, settings.perturb, w, h, band );
 			for( const auto& cell : band )
 			{
-				uint8_t& v = grid.at( cell.first, cell.second );
+				const int x = cell.first, y = cell.second;
+				uint8_t& v  = grid.at( x, y );
 				if( v == kHole )
 					v = kBridge;
-			}
-			for( const auto& cell : band )
-			{
-				const int x     = cell.first, y = cell.second;
-				const int32_t i = y * w + x;
-				if( x > 0 && IsSheet( grid.at( x - 1, y ) ) )
-					forest.unite( i, i - 1 );
-				if( x < w - 1 && IsSheet( grid.at( x + 1, y ) ) )
-					forest.unite( i, i + 1 );
-				if( y > 0 && IsSheet( grid.at( x, y - 1 ) ) )
-					forest.unite( i, i - w );
-				if( y < h - 1 && IsSheet( grid.at( x, y + 1 ) ) )
-					forest.unite( i, i + w );
+				//Whatever piece the band touches, it joins.
+				const int nx[ 5 ] = { x, x - 1, x + 1, x, x };
+				const int ny[ 5 ] = { y, y, y, y - 1, y + 1 };
+				for( int n = 0; n < 5; ++n )
+				{
+					if( nx[ n ] < 0 || ny[ n ] < 0 || nx[ n ] >= w || ny[ n ] >= h )
+						continue;
+					const uint32_t l = labels[ static_cast< size_t >( ny[ n ] ) * w + nx[ n ] ];
+					if( l != 0 )
+						joined.unite( ia, idOf( l ) );
+				}
 			}
 			Bridge b;
 			b.ax     = c.key.ax;
@@ -413,21 +537,11 @@ Result Cut( Grid& grid, const Settings& settings, const std::vector< Bridge >& h
 	}
 
 	//--- what is left floating (nothing, unless the passes ran out) ------------
-	{
-		const int32_t anchor = forest.find( 0 );
-		std::vector< uint8_t > seen( cells, 0 );
-		for( size_t i = 0; i < cells; ++i )
-			if( IsSheet( grid.cells[ i ] ) )
-			{
-				const int32_t r = forest.find( static_cast< int32_t >( i ) );
-				if( r != anchor && !seen[ static_cast< size_t >( r ) ] )
-				{
-					seen[ static_cast< size_t >( r ) ] = 1;
-					if( result.floatingLeft >= 0 )
-						++result.floatingLeft;
-				}
-			}
-	}
+	relabel();
+	if( result.floatingLeft >= 0 )
+		for( size_t r = 0; r < runs.runs.size(); ++r )
+			if( runs.forest.find( static_cast< int32_t >( r ) ) == static_cast< int32_t >( r ) && runs.forest.find( 0 ) != static_cast< int32_t >( r ) )
+				++result.floatingLeft;
 	result.cpuMillis = millisSince( start ) - result.floodMillis;
 	return result;
 }

@@ -611,12 +611,7 @@ void runLayers( int width, int height, int perturb, bool quiet )
 			worst = std::max( worst, d );
 			++judged;
 			if( d > 1e-6 )
-			{
 				++wrong;
-				if( std::getenv( "SNTEST_DEBUG_LAYERS" ) )
-					std::printf( "   x %d texel %d tone %.6f band %d got %.3f %.3f %.3f want %.3f %.3f %.3f\n", x, i, tone, band,
-					             got[ 0 ], got[ 1 ], got[ 2 ], want[ 0 ], want[ 1 ], want[ 2 ] );
-			}
 			if( band != lastBand )
 			{
 				++runs;
@@ -704,13 +699,6 @@ double churnOf( int width, int height, fixtures::PanCache& pictures, int perturb
 		const double pan = f * pxPerFrame / height;
 		s.render( pictures.at( f * pxPerFrame ) );
 		const std::vector< Seen > now = bridgesOf( s.plugin, pan, height );
-		if( std::getenv( "SNTEST_DEBUG_CHURN" ) && f < 12 )
-		{
-			std::printf( "frame %d:", f );
-			for( const bridge::Bridge& b : s.plugin.CutForTest( 1 ).bridges )
-				std::printf( " [p%d %s (%d,%d)->(%d,%d) %.2f]", b.pass, b.kept ? "k" : "-", b.ax, b.ay, b.bx, b.by, b.length );
-			std::printf( "\n" );
-		}
 		if( f > 0 )
 		{
 			const int m = unmatched( now, previous, 1.5 * texel ) + unmatched( previous, now, 1.5 * texel );
@@ -989,8 +977,9 @@ void runExact( bool cityBlock, bool quiet )
 /// nearest sheet cell other than the cell itself, whatever its piece.
 bridge::Flood bruteFlood( bool ignoreLabels )
 {
-	return [ ignoreLabels ]( const std::vector< uint32_t >& labels, int w, int h, std::vector< uint16_t >& second ) {
-		second.assign( static_cast< size_t >( w ) * h * 2, bridge::kNone );
+	return [ ignoreLabels ]( const std::vector< uint32_t >& labels, int w, int h, const bridge::Region&,
+	                         std::vector< uint32_t >& second ) {
+		second.assign( static_cast< size_t >( w ) * h, bridge::kNone );
 		std::vector< int > sheet;
 		for( int i = 0; i < w * h; ++i )
 			if( labels[ static_cast< size_t >( i ) ] )
@@ -1030,10 +1019,7 @@ bridge::Flood bruteFlood( bool ignoreLabels )
 				}
 			}
 			if( s2 >= 0 )
-			{
-				second[ 2 * static_cast< size_t >( i ) ]     = static_cast< uint16_t >( s2 % w );
-				second[ 2 * static_cast< size_t >( i ) + 1 ] = static_cast< uint16_t >( s2 / w );
-			}
+				second[ static_cast< size_t >( i ) ] = bridge::Pack( s2 % w, s2 / w );
 		}
 		return true;
 	};
@@ -1289,7 +1275,7 @@ int runBench( const std::vector< std::string >& settings, int frames, bool fourK
 	std::printf( "the defaults on the bench scene (blobs through letters), %d frames, best of three runs, after a warm-up, "
 	             "glFinish both sides\n\n",
 	             frames );
-	std::printf( "resolution  lattice    ms/frame   detect  flood   cutter  paint   passes  islands  bridges  label ms\n" );
+	std::printf( "resolution  lattice    ms/frame   detect  flood   cutter  paint   passes  islands  bridges  label ms  grids flooded\n" );
 	for( const Size& size : sizes )
 	{
 		Session s;
@@ -1327,10 +1313,14 @@ int runBench( const std::vector< std::string >& settings, int frames, bool fourK
 			t.passes = now.passes;
 		}
 		int islands = 0, bridges = 0;
+		double flooded = 0.0, grids = 0.0;
 		for( int layer = 1; layer <= s.plugin.LayersForTest(); ++layer )
 		{
-			islands += s.plugin.CutForTest( layer ).islands;
-			bridges += static_cast< int >( s.plugin.CutForTest( layer ).bridges.size() );
+			const bridge::Result& r = s.plugin.CutForTest( layer );
+			islands += r.islands;
+			bridges += static_cast< int >( r.bridges.size() );
+			flooded += static_cast< double >( r.regionCells );
+			grids += static_cast< double >( s.plugin.GridForTest( layer ).cells.size() );
 		}
 		//The labelling alone: union-find over the first layer's grid, best
 		//of twenty.
@@ -1346,15 +1336,16 @@ int runBench( const std::vector< std::string >& settings, int frames, bool fourK
 				labelBest = std::min( labelBest, std::chrono::duration< double, std::milli >( std::chrono::steady_clock::now() - start ).count() );
 			}
 		}
-		std::printf( "%s   %4dx%-4d  %7.3f   %6.3f  %6.3f  %6.3f  %6.3f  %4d    %5d    %5d     %6.3f\n", size.name,
+		std::printf( "%s   %4dx%-4d  %7.3f   %6.3f  %6.3f  %6.3f  %6.3f  %4d    %5d    %5d     %6.3f    %5.2f\n", size.name,
 		             s.plugin.LatticeWidthForTest(), s.plugin.LatticeHeightForTest(), best, t.detect, t.flood, t.cutter,
-		             t.paint, t.passes, islands, bridges, labelBest );
+		             t.paint, t.passes, islands, bridges, labelBest, grids > 0.0 ? flooded / grids : 0.0 );
 		s.end();
 	}
 	std::printf( "\ndetect = detect + smooth + the tone's readback; flood = every flood pass of every layer, with its label\n"
 	             "upload and seed readback (GPU, and the stall); cutter = labelling, choosing and cutting on the CPU;\n"
 	             "paint = spray, creep, settle and the composite; label = one union-find labelling of one layer's grid\n"
-	             "on the CPU (part of cutter). The stage times are the best of ten frames each.\n" );
+	             "on the CPU (part of cutter); grids flooded = cells flooded over every pass, in whole grids a layer\n"
+	             "(1 would be one full flood per layer). The stage times are the best of ten frames each.\n" );
 	return 0;
 }
 

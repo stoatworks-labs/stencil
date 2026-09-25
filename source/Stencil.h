@@ -154,12 +154,14 @@ public:
 
 private:
 	bool compileAll();
-	bool flood( const std::vector< uint32_t >& labels, int width, int height, std::vector< uint16_t >& second );
+	bool flood( const std::vector< uint32_t >& labels, int width, int height, const stencil::bridge::Region& region,
+	            std::vector< uint32_t >& second );
 
 	ffglex::FFGLShader detectShader;
 	ffglex::FFGLShader blurShader;
 	ffglex::FFGLShader seedShader;
 	ffglex::FFGLShader floodShader;
+	ffglex::FFGLShader secondShader;
 	ffglex::FFGLShader sprayShader;
 	ffglex::FFGLShader settleShader;
 	ffglex::FFGLShader compositeShader;
@@ -167,7 +169,9 @@ private:
 
 	stencil::PassBuffer tone[ 2 ];  ///< tone and colour, and the blur's scratch; lattice
 	stencil::PassBuffer labels;     ///< the pieces' labels, R32UI; grid
-	stencil::PassBuffer seeds[ 2 ]; ///< the flood's ping-pong, RGBA16UI; grid
+	stencil::PassBuffer seeds[ 2 ]; ///< the flood's ping-pong, RGBA32UI; grid
+	stencil::PassBuffer seconds;    ///< the second seed's position, R32UI; grid
+	std::vector< uint32_t > regionValues;///< a region's seconds, read back
 	stencil::PassBuffer cut;        ///< the cut stencil, RGBA8, a layer a channel; lattice
 	stencil::PassBuffer taps;       ///< the footprint's taps, RGBA32F, N x 1
 	stencil::PassBuffer sprayed;    ///< the spray through the holes, RGBA16F; lattice
@@ -187,7 +191,6 @@ private:
 
 	std::vector< float > toneValues; ///< lattice, the tone (R)
 	std::vector< float > colourValues;///< lattice RGBA, for From Clip
-	std::vector< uint16_t > seedValues;
 	std::vector< uint8_t > cutValues;///< lattice RGBA8
 
 	stencil::bridge::Grid grids[ 4 ];

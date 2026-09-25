@@ -14,6 +14,10 @@ void uploadFormatFor( GLint internalFormat, GLenum& format, GLenum& type )
 		format = GL_RGBA_INTEGER;
 		type   = GL_UNSIGNED_SHORT;
 		return;
+	case GL_RGBA32UI:
+		format = GL_RGBA_INTEGER;
+		type   = GL_UNSIGNED_INT;
+		return;
 	case GL_RG16UI:
 		format = GL_RG_INTEGER;
 		type   = GL_UNSIGNED_SHORT;
@@ -44,7 +48,7 @@ void uploadFormatFor( GLint internalFormat, GLenum& format, GLenum& type )
 
 bool isUnsigned( GLint internalFormat )
 {
-	return internalFormat == GL_RGBA16UI || internalFormat == GL_RG16UI || internalFormat == GL_R32UI;
+	return internalFormat == GL_RGBA16UI || internalFormat == GL_RGBA32UI || internalFormat == GL_RG16UI || internalFormat == GL_R32UI;
 }
 
 /// The bindings a buffer operation disturbs, put back on scope exit.

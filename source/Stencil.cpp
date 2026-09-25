@@ -156,6 +156,7 @@ bool Stencil::compileAll()
 		{ &blurShader, shaders::Blur(), "blur" },
 		{ &seedShader, shaders::Seed(), "seed" },
 		{ &floodShader, shaders::Flood(), "flood" },
+		{ &secondShader, shaders::Second(), "second" },
 		{ &sprayShader, shaders::Spray(), "spray" },
 		{ &settleShader, shaders::Settle(), "settle" },
 		{ &compositeShader, shaders::Composite(), "composite" },
@@ -198,7 +199,8 @@ FFResult Stencil::InitGL( const FFGLViewportStruct* vp )
 // The flood the cutter asks for: upload the labels, seed, jump-flood with
 // two seeds a texel, read the seconds back.
 //---------------------------------------------------------------------------
-bool Stencil::flood( const std::vector< uint32_t >& pieceLabels, int width, int height, std::vector< uint16_t >& second )
+bool Stencil::flood( const std::vector< uint32_t >& pieceLabels, int width, int height, const bridge::Region& region,
+                     std::vector< uint32_t >& second )
 {
 	if( labels.Width() != width || labels.Height() != height || !seeds[ 0 ].IsValid() )
 		return false;
@@ -216,10 +218,16 @@ bool Stencil::flood( const std::vector< uint32_t >& pieceLabels, int width, int 
 	//of halving steps from 1/128 of it (toolpath's: with only 2, 1 the thin
 	//Voronoi wedges of a curved boundary leave seeds further out the larger
 	//the raster).
+	//Only the region is flooded; the seed pass above covered the whole grid,
+	//and the flood reads nothing outside the region, so what the other
+	//buffer holds out there from an earlier flood is never seen.
+	const int rw = region.x1 - region.x0, rh = region.y1 - region.y0;
+	if( rw <= 0 || rh <= 0 )
+		return false;
 	std::vector< int > steps;
 	steps.push_back( 1 );
 	int longest = 1;
-	while( longest < std::max( width, height ) )
+	while( longest < std::max( rw, rh ) )
 		longest *= 2;
 	for( int step = longest / 2; step >= 1; step /= 2 )
 		steps.push_back( step );
@@ -228,34 +236,46 @@ bool Stencil::flood( const std::vector< uint32_t >& pieceLabels, int width, int 
 
 	glUseProgram( floodShader.GetGLID() );
 	floodShader.Set( "Seeds", 0 );
-	floodShader.Set( "Labels", 1 );
-	glUniform2i( floodShader.FindUniform( "Size" ), width, height );
-	bindTexture( 1, labels.TextureID() );
+	glUniform4i( floodShader.FindUniform( "Region" ), region.x0, region.y0, region.x1, region.y1 );
+	//The viewport, not a scissor, confines the draws to the region:
+	//gl_FragCoord stays in the framebuffer's own pixels either way, and
+	//Apple's software renderer produced nothing usable under a scissor on
+	//these integer targets (the nested rings stayed floating for 32 passes).
 	int current = 0;
 	for( int step : steps )
 	{
 		seeds[ 1 - current ].BindForDrawing();
+		glViewport( region.x0, region.y0, rw, rh );
 		bindTexture( 0, seeds[ current ].TextureID() );
 		floodShader.Set( "Step", step );
 		quad.Draw();
 		current = 1 - current;
 	}
 
-	//3. read back
-	seedValues.resize( static_cast< size_t >( width ) * height * 4 );
-	glBindFramebuffer( GL_FRAMEBUFFER, seeds[ current ].FramebufferID() );
-	glPixelStorei( GL_PACK_ALIGNMENT, 2 );
-	glReadPixels( 0, 0, width, height, GL_RGBA_INTEGER, GL_UNSIGNED_SHORT, seedValues.data() );
-	glPixelStorei( GL_PACK_ALIGNMENT, 4 );
-	bindTexture( 1, 0 );
-	bindTexture( 0, 0 );
+	//3. the seconds alone, and read them back
+	seconds.BindForDrawing();
+	glViewport( region.x0, region.y0, rw, rh );
+	glUseProgram( secondShader.GetGLID() );
+	bindTexture( 0, seeds[ current ].TextureID() );
+	secondShader.Set( "Seeds", 0 );
+	quad.Draw();
 
-	second.resize( static_cast< size_t >( width ) * height * 2 );
-	for( size_t i = 0, n = static_cast< size_t >( width ) * height; i < n; ++i )
+	//The shader writes x | y << 16, which is bridge::Pack, and kNoSeed,
+	//which is bridge::kNone: read straight into the cutter's array.
+	static_assert( shaders::kNoSeed == bridge::kNone, "the flood's none is the cutter's" );
+	second.resize( static_cast< size_t >( width ) * height, bridge::kNone );
+	glPixelStorei( GL_PACK_ALIGNMENT, 4 );
+	if( rw == width && rh == height )
+		glReadPixels( 0, 0, width, height, GL_RED_INTEGER, GL_UNSIGNED_INT, second.data() );
+	else
 	{
-		second[ 2 * i ]     = seedValues[ 4 * i + 2 ];
-		second[ 2 * i + 1 ] = seedValues[ 4 * i + 3 ];
+		regionValues.resize( static_cast< size_t >( rw ) * rh );
+		glReadPixels( region.x0, region.y0, rw, rh, GL_RED_INTEGER, GL_UNSIGNED_INT, regionValues.data() );
+		for( int y = 0; y < rh; ++y )
+			std::copy( regionValues.begin() + static_cast< long >( y ) * rw, regionValues.begin() + static_cast< long >( y + 1 ) * rw,
+			           second.begin() + static_cast< long >( ( region.y0 + y ) * width + region.x0 ) );
 	}
+	bindTexture( 0, 0 );
 	return true;
 }
 
@@ -339,8 +359,9 @@ FFResult Stencil::ProcessOpenGL( ProcessOpenGLStruct* pGL )
 	const bool allocated = tone[ 0 ].Ensure( lw, lh, GL_RGBA16F, PassBuffer::Sampling::Nearest )
 	                       && tone[ 1 ].Ensure( lw, lh, GL_RGBA16F, PassBuffer::Sampling::Nearest )
 	                       && labels.Ensure( gw, gh, GL_R32UI, PassBuffer::Sampling::Nearest )
-	                       && seeds[ 0 ].Ensure( gw, gh, GL_RGBA16UI, PassBuffer::Sampling::Nearest )
-	                       && seeds[ 1 ].Ensure( gw, gh, GL_RGBA16UI, PassBuffer::Sampling::Nearest )
+	                       && seeds[ 0 ].Ensure( gw, gh, GL_RGBA32UI, PassBuffer::Sampling::Nearest )
+	                       && seeds[ 1 ].Ensure( gw, gh, GL_RGBA32UI, PassBuffer::Sampling::Nearest )
+	                       && seconds.Ensure( gw, gh, GL_R32UI, PassBuffer::Sampling::Nearest )
 	                       && cut.Ensure( lw, lh, GL_RGBA8, PassBuffer::Sampling::Nearest )
 	                       && sprayed.Ensure( lw, lh, GL_RGBA16F, PassBuffer::Sampling::Nearest )
 	                       && creep[ 0 ].Ensure( lw, lh, GL_RGBA16F, PassBuffer::Sampling::Nearest )
@@ -410,8 +431,9 @@ FFResult Stencil::ProcessOpenGL( ProcessOpenGLStruct* pGL )
 	settings.keepSlack     = kKeepSlack;
 	settings.keepRadius    = kKeepRadius;
 	settings.perturb       = perturb & 0xff;
-	const bridge::Flood gpu = [ this ]( const std::vector< uint32_t >& l, int w, int h, std::vector< uint16_t >& s ) {
-		return flood( l, w, h, s );
+	const bridge::Flood gpu = [ this ]( const std::vector< uint32_t >& l, int w, int h, const bridge::Region& r,
+	                                    std::vector< uint32_t >& s ) {
+		return flood( l, w, h, r, s );
 	};
 
 	cutValues.assign( static_cast< size_t >( lw ) * lh * 4, 0 );
@@ -609,11 +631,12 @@ FFResult Stencil::DeInitGL()
 	blurShader.FreeGLResources();
 	seedShader.FreeGLResources();
 	floodShader.FreeGLResources();
+	secondShader.FreeGLResources();
 	sprayShader.FreeGLResources();
 	settleShader.FreeGLResources();
 	compositeShader.FreeGLResources();
 	quad.Release();
-	for( PassBuffer* b : { &tone[ 0 ], &tone[ 1 ], &labels, &seeds[ 0 ], &seeds[ 1 ], &cut, &taps, &sprayed, &creep[ 0 ],
+	for( PassBuffer* b : { &tone[ 0 ], &tone[ 1 ], &labels, &seeds[ 0 ], &seeds[ 1 ], &seconds, &cut, &taps, &sprayed, &creep[ 0 ],
 	                       &creep[ 1 ], &coverage } )
 		b->Destroy();
 	tapRadius = -1.0;

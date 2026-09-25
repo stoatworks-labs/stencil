@@ -128,27 +128,29 @@ void main()
 
 //---------------------------------------------------------------------------
 // 3. seed. Every sheet texel of the grid is its own nearest sheet; nothing
-// knows yet of another piece.
+// knows yet of another piece. A seed is (position, piece): the position
+// packed x | y << 16, NONE for none, and the piece's label beside it, so the
+// flood never has to look a label up.
 //---------------------------------------------------------------------------
 const char* const kSeedBody = R"(
 uniform usampler2D Labels;//0 hole, else the piece's label
 
 out uvec4 fragSeeds;
 
-const uint NONE = 65535u;
+const uint NONE = 0xffffffffu;
 
 void main()
 {
 	ivec2 p = ivec2( gl_FragCoord.xy );
 	uint l  = texelFetch( Labels, p, 0 ).r;
-	fragSeeds = l != 0u ? uvec4( uvec2( p ), NONE, NONE ) : uvec4( NONE );
+	fragSeeds = l != 0u ? uvec4( uint( p.x ) | ( uint( p.y ) << 16 ), l, NONE, 0u ) : uvec4( NONE, 0u, NONE, 0u );
 }
 )";
 
 //---------------------------------------------------------------------------
 // 4. flood. One jump-flooding pass at Step, carrying two seeds: the nearest
 // sheet texel (first), and the nearest sheet texel whose piece is not the
-// first's (second).
+// first's (second), each as (position, piece).
 //
 // Distances are squared integers and ties are broken by the seed's (y, x),
 // a total order, so the result is a pure function of the labels whatever
@@ -156,50 +158,59 @@ void main()
 // the picture translates it.
 //---------------------------------------------------------------------------
 const char* const kFloodBody = R"(
-uniform usampler2D Seeds;
-uniform usampler2D Labels;
+uniform usampler2D Seeds;//RGBA32UI: first (position, piece), second (position, piece)
 uniform int Step;
-uniform ivec2 Size;
+uniform ivec4 Region;    //the cells flooded, [x, z) x [y, w): nothing outside is read
 
 out uvec4 fragSeeds;
 
-const uint NONE = 65535u;
+const uint NONE = 0xffffffffu;
 const int FAR   = 0x7fffffff;
 
 ivec2 p;
-uvec2 firstSeed;
+uint firstSeed;
 int firstDist;
 uint firstLabel;
-uvec2 secondSeed;
+uint secondSeed;
 int secondDist;
+uint secondLabel;
 
-//Is (d, s) nearer than (dRef, sRef)? Ties by y, then x.
-bool nearer( int d, uvec2 s, int dRef, uvec2 sRef )
+ivec2 unpack( uint s )
+{
+	return ivec2( int( s & 0xffffu ), int( s >> 16 ) );
+}
+
+int distanceTo( uint s )
+{
+	if( s == NONE )
+		return FAR;
+	ivec2 v = unpack( s ) - p;
+	return v.x * v.x + v.y * v.y;
+}
+
+//Is (d, s) nearer than (dRef, sRef)? Ties by y, then x: the packed position
+//IS (y, x) in order, y in the high half.
+bool nearer( int d, uint s, int dRef, uint sRef )
 {
 	if( d != dRef )
 		return d < dRef;
-	if( s.y != sRef.y )
-		return s.y < sRef.y;
-	return s.x < sRef.x;
+	return s < sRef;
 }
 
-void consider( uvec2 s )
+void consider( uint s, uint l )
 {
-	if( s.x == NONE )
+	if( s == NONE || l == 0u )
 		return;
-	uint l = texelFetch( Labels, ivec2( s ), 0 ).r;
-	if( l == 0u )
-		return;
-	ivec2 v = ivec2( s ) - p;
-	int d   = v.x * v.x + v.y * v.y;
+	int d = distanceTo( s );
 	if( nearer( d, s, firstDist, firstSeed ) )
 	{
 		//The old first becomes the second if it is another piece's: it is
 		//then nearer than any second of that piece's own could be.
 		if( l != firstLabel && firstLabel != 0u )
 		{
-			secondSeed = firstSeed;
-			secondDist = firstDist;
+			secondSeed  = firstSeed;
+			secondDist  = firstDist;
+			secondLabel = firstLabel;
 		}
 		firstSeed  = s;
 		firstDist  = d;
@@ -207,28 +218,22 @@ void consider( uvec2 s )
 	}
 	else if( l != firstLabel && nearer( d, s, secondDist, secondSeed ) )
 	{
-		secondSeed = s;
-		secondDist = d;
+		secondSeed  = s;
+		secondDist  = d;
+		secondLabel = l;
 	}
-}
-
-int distanceTo( uvec2 s )
-{
-	if( s.x == NONE )
-		return FAR;
-	ivec2 v = ivec2( s ) - p;
-	return v.x * v.x + v.y * v.y;
 }
 
 void main()
 {
-	p          = ivec2( gl_FragCoord.xy );
-	uvec4 own  = texelFetch( Seeds, p, 0 );
-	firstSeed  = own.xy;
-	firstDist  = distanceTo( own.xy );
-	firstLabel = own.x == NONE ? 0u : texelFetch( Labels, ivec2( own.xy ), 0 ).r;
-	secondSeed = own.zw;
-	secondDist = distanceTo( own.zw );
+	p           = ivec2( gl_FragCoord.xy );
+	uvec4 own   = texelFetch( Seeds, p, 0 );
+	firstSeed   = own.x;
+	firstLabel  = own.y;
+	firstDist   = distanceTo( own.x );
+	secondSeed  = own.z;
+	secondLabel = own.w;
+	secondDist  = distanceTo( own.z );
 
 	for( int dy = -1; dy <= 1; ++dy )
 	{
@@ -237,14 +242,29 @@ void main()
 			if( dx == 0 && dy == 0 )
 				continue;
 			ivec2 q = p + ivec2( dx, dy ) * Step;
-			if( q.x < 0 || q.y < 0 || q.x >= Size.x || q.y >= Size.y )
+			if( q.x < Region.x || q.y < Region.y || q.x >= Region.z || q.y >= Region.w )
 				continue;
 			uvec4 c = texelFetch( Seeds, q, 0 );
-			consider( c.xy );
-			consider( c.zw );
+			consider( c.x, c.y );
+			consider( c.z, c.w );
 		}
 	}
-	fragSeeds = uvec4( firstSeed, secondSeed );
+	fragSeeds = uvec4( firstSeed, firstLabel, secondSeed, secondLabel );
+}
+)";
+
+//---------------------------------------------------------------------------
+// 4b. second. Only the second seed's position leaves the GPU: a quarter of
+// what the flood holds.
+//---------------------------------------------------------------------------
+const char* const kSecondBody = R"(
+uniform usampler2D Seeds;
+
+out uvec4 fragSecond;
+
+void main()
+{
+	fragSecond = uvec4( texelFetch( Seeds, ivec2( gl_FragCoord.xy ), 0 ).z, 0u, 0u, 0u );
 }
 )";
 
@@ -487,6 +507,10 @@ std::string Seed()
 std::string Flood()
 {
 	return assemble( kFloodBody );
+}
+std::string Second()
+{
+	return assemble( kSecondBody );
 }
 std::string Spray()
 {
