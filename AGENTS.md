@@ -394,8 +394,8 @@ otherwise.
   islands, best of three runs of 30 frames, `glFinish` both sides), on a Mac busy with an
   ffmpeg encode on twelve cores, a VM and other harnesses on the same GPU, so the same
   bench moved by a factor of two between runs. Every run of the final build, best first:
-  7.9–20 ms at 720p, 13–26 ms at 1080p, 22 ms at 4K (one run); of which the floods
-  3.3–8.6 / 5.7–8.4 / 8.4 ms and the cutter 1.9–4.4 / 3.8–6.5 / 6.0 ms; one labelling
+  7.4–20 ms at 720p, 13–26 ms at 1080p, 22 ms at 4K (one run); of which the floods
+  2.7–8.6 / 4.2–8.4 / 8.4 ms and the cutter 1.9–4.4 / 3.8–6.5 / 6.0 ms; one labelling
   0.13 ms at 640×360, 0.27 at 960×540; the later passes flood 0.24 of a grid. The first
   cutter was 33 ms at 1080p (the trap above).
 

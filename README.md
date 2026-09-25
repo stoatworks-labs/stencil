@@ -144,8 +144,8 @@ runs; the range is every run of the final build, the best first:
 
 | | lattice | ms/frame | the floods | the cutter (CPU) |
 | --- | --- | --- | --- | --- |
-| 1280×720 | 640×360 | 7.9–20 | 3.3–8.6 | 1.9–4.4 |
-| 1920×1080 | 960×540 | 13–26 | 5.7–8.4 | 3.8–6.5 |
+| 1280×720 | 640×360 | 7.4–20 | 2.7–8.6 | 1.9–4.4 |
+| 1920×1080 | 960×540 | 13–26 | 4.2–8.4 | 3.8–6.5 |
 | 3840×2160 | 960×540 | 22 (one run) | 8.4 | 6.0 |
 
 The bridging is most of it: the floods (every pass of every layer, with the label upload
@@ -179,7 +179,7 @@ into `~/Documents/Resolume Arena/Extra Effects`; for Avenue, pass
 ## Building and testing
 
 ```sh
-tools/verify.sh                                   # everything, several minutes
+tools/verify.sh                                   # everything, about five minutes
 ./build/sntest --list                             # the parameters
 ./build/sntest --islands --size 320x180           # one check
 ./build/sntest --negative                         # every check can fail
