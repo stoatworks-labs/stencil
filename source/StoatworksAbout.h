@@ -17,7 +17,7 @@ namespace stoatworks::about
     inline constexpr auto slug = "stencil";
     inline constexpr auto hook = "Spray paint through a cut stencil, for Resolume";
     inline constexpr auto licence = "MIT";
-    inline constexpr auto guide = "";
+    inline constexpr auto guide = "https://stoatworks-labs.com/software/stencil/guide/";
     inline constexpr auto page = "https://stoatworks-labs.com/software/stencil/";
     inline constexpr auto repo = "https://github.com/stoatworks-labs/stencil";
     inline constexpr auto versionFallback = "v0.1.0";
