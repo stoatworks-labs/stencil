@@ -10,8 +10,9 @@ tell anybody this works.
 
 Spray paint through a cut stencil, as an FFGL 2.1 effect (`SN01`, shown as `SW Stencil`)
 for Resolume Arena and Avenue. C++17 + GLSL 4.10, CMake, universal macOS `.bundle` and a
-Windows `.dll`. MIT, intended home `github.com/stoatworks-labs/stencil`. **Local only at
-v0.1.0** — no remote, no tag, not registered anywhere, never loaded into Resolume.
+Windows `.dll`. MIT, at `github.com/stoatworks-labs/stencil`. **Released at v0.1.0 on
+2026-09-25**; registered on the site, with a user guide, a browser demo and a video. Never
+loaded into Resolume on macOS; on Windows it passes the fleet's Arena gate (below).
 
 Built 2026-09-25 in one session (tranche five; Allan picked the idea) from
 `specs/SPEC-stencil.md` with `BRIEF.md` and `BRIEF-ADDENDUM.md`: toolpath for the jump
@@ -333,7 +334,8 @@ bridged at all.)
 - **`StoatworksAbout.h`, `StoatworksAboutLinks.h`, `StoatworksAboutParams.h` and
   `ATTRIBUTIONS.md` are provisional hand copies**, adapted from toolpath's, with
   `guide=""` (no guide exists, so no guide button): register the project and re-run the
-  syncs before the first release.
+  syncs before the first release. (Done at the release: `StoatworksAbout.h` and
+  `ATTRIBUTIONS.md` are generated now, and the guide button is in.)
 - **The commit trailer names the model that did the work** (`Claude Opus 5.5`), as the
   session's instructions asked, over the brief's.
 - **Defaults** (two layers, Mono on Concrete, Threshold 0.5, Smooth 0.3, bridges 0.5%,
@@ -401,24 +403,57 @@ otherwise.
 
 ### Assumed, or not done
 
-- ☠️ **Never loaded into Resolume**, on either platform. Everything was compiled,
-  rendered and measured offline against the real plugin class in a headless CGL context,
-  plus an `oxbow` load.
-- **Never built on Windows.** The CI workflow is written, not run.
+- ☠️ **Never loaded into Resolume on macOS.** Everything was compiled, rendered and
+  measured offline against the real plugin class in a headless CGL context, plus an `oxbow`
+  load. **On Windows** (release, 2026-09-25): MSVC compiled it first time in CI, and the DLL
+  release.yml built passes the fleet's Arena gate on win-lab (Arena 7.27.1, Mesa llvmpipe):
+  9/9, all 20 controls as declared, all 15 controls live over a noise floor of 0 — Bridge
+  Width and Min Island only just (0.25, 0.30 levels on the gate's thumbnail), Drips and Lift
+  1.3, the rest 5.8–76. One run; the gate's carrier is a still.
 - **Seen on six demo clips only**, one frame each and a few seconds of Metalive; never on
   camera footage, never over minutes.
 - **The render cost is heavy**: at 1080p most of a 60 fps frame here, more with more
-  layers or islands. Whether Resolume leaves that much is unmeasured.
+  layers or islands. Whether Resolume leaves that much is unmeasured. The release
+  re-measured it (README Status): on the demo clips at 1080p about 9–22 ms at the defaults,
+  5–12 ms with one layer. **Two layers stay the default** because at one layer every
+  palette sprays its near-black darkest can, so Palette would be nearly inert.
 - **The jump flood has no proven bound**; the spec's 1-texel allowance was never needed,
   but it is an allowance, not a derivation.
 - **Lift, drips, the walls and the palettes** are chosen to look right, not measured
   against anything.
 - **At k = 3** (1081–1620-row compositions) the output's bilinear weights are thirds, not
   covered by the `--overspray` or `--islands` arguments above, and never run.
-- **No OpenFX port, no user guide, no factory presets.**
-- **The provisional About headers and ATTRIBUTIONS** are hand copies (above).
+- **No OpenFX port, no factory presets.** The About headers and ATTRIBUTIONS are generated
+  since the release registered the project.
 
 ---
+
+## What filming the release video found (2026-09-25)
+
+The video (`stoatworks-backend/video/projects/stencil/`) is `sntest --pipe` over Resolume's
+demo clips from one cue sheet. A still per beat, looked at before cutting, found:
+
+- **Dark is paint, so a bright subject on transparency paints nothing** at the defaults
+  (Ethnik2_23's fire: a bare wall). Kept as a beat, with Invert turning it on.
+- **Invert at the default Threshold paints little on the dark demo loops** (Ethnik2,
+  Enter5, FogAndDust, SpaceUniverse: specks). Invert usually wants Threshold raised too.
+- **The default Pressure (1.12, over kSaturation 0.9) hangs a fringe of drips** from the
+  lower edge of nearly every solid run of paint (18% of columns at Drips 0.4). That is the
+  default look; the guide says to take Pressure under 0.9 or Drips to 0 for clean edges.
+- **One layer makes Palette nearly inert**: every palette's darkest can is a near-black.
+  This is why the release kept two layers as the default rather than the cheaper one.
+- **The pan beat is a whole-pixel pan** (ffmpeg's crop takes whole pixels: one pixel every
+  two or three frames). Measured on the take, pixels changing > 8/255 frame to frame over
+  43–49 s at 960×540 grey: the source 10.3% mean, the stencil 3.9%. The bridge churn itself
+  is `--churn`'s number (1–7% kept), not measured on the take.
+
+## The release cost measurement (2026-09-25)
+
+`sntest --bench` measures only the bench scene. For real clips the release put 90 decoded
+1080p frames of three demo clips through `--pipe` and timed the wall clock, then subtracted
+the harness's own frame I/O (~9 ms: the bench scene rendered once to PNG and put through
+`--pipe` read 24–25 ms against `--bench`'s 15–16 ms). Estimates, not a check: skulls ~22 ms
+(1 layer ~12), Metalive ~14 (~7), Trinity ~9 (~5).
 
 ## Open questions
 

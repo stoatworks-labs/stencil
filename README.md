@@ -92,7 +92,9 @@ landed, and paint is opaque where it did.
 
 ## Status
 
-**v0.1.0, unreleased, and honestly early — 25 September 2026.**
+**v0.1.0, released 25 September 2026, and honestly early.** There is a
+[user guide](https://stoatworks-labs.com/software/stencil/guide/) and a
+[project page](https://stoatworks-labs.com/software/stencil/).
 
 ### Measured offline, on macOS
 
@@ -155,11 +157,28 @@ of a grid. The lattice stops at 540 rows, so 4K costs what 1080p does but the co
 This is not cheap: at 1080p it is most of a 60 fps frame even at its best here, and more
 layers or more islands cost more. Before the cutter was reworked it was 33 ms at 1080p.
 
+Measured again for the release on a quieter moment (three runs each): the bench scene at the
+defaults 9.5–11.4 ms at 720p, 14.9–16.3 ms at 1080p, 15.4–17.0 ms at 4K; one layer 7.8–9.1 ms
+and four layers 31–33 ms at 1080p. On Resolume's demo clips at 1080p through `--pipe`, less the
+harness's own frame input and output (~9 ms, measured by putting the bench scene through both
+ways): the skulls about 22 ms (one layer about 12), the sphere about 14 (7), three rings about
+9 (5). **The default stays at two layers**: one layer would be cheaper, but every palette's
+darkest can is a near-black, so Palette would do almost nothing and the dark-over-light tones
+would go; the user guide says how to make it cheaper.
+
+### In Resolume
+
+**In Resolume Arena 7.27.1 on Windows** (win-lab, software rendering, no GPU): the DLL
+release.yml built loads, registers as `SW Stencil` / `SN01` / effect, all 20 host controls match
+the declaration, it renders, Arena's log stays clean, and all 14 valued controls plus Opacity
+move the picture: 9 of 9 of the fleet's Arena gate, one run. The gate's picture is a still, and
+software rendering says nothing about speed.
+
 ### Not done
 
-- **Never loaded into Resolume**, and never built on Windows.
+- **Never loaded into Resolume on macOS.**
 - Seen only on six of Resolume's bundled demo clips, never on camera footage.
-- No user guide, no OpenFX port, no factory presets.
+- No OpenFX port, no factory presets.
 
 ## Try it in your browser
 

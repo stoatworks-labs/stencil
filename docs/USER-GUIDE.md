@@ -28,7 +28,7 @@ on the Brick wall, rendered by the offline harness rather than captured from Res
 > all 14 controls are shown to change the picture. It is **heavy for a VJ effect** (see
 > Performance). It has **never been loaded into Resolume on macOS** — the one host it has run in
 > there is the fleet's own test host, `oxbow`, for 120 frames.
-> WINDOWS_GATE_PENDING
+> On Windows it has: the DLL release.yml built from this source loads in Resolume Arena 7.27.1 on software rendering (win-lab, Mesa llvmpipe, no GPU), registers as `SW Stencil` / `SN01` / effect, all 20 host controls match what the plugin declares, it renders, Arena's log stays clean, and all 14 valued controls and Arena's own Opacity move the picture (against a noise floor of 0; Bridge Width and Min Island only just, at 0.25 and 0.30 levels, on the gate's small thumbnail): 9 of the fleet Arena gate's 9 checks, one run. The gate's picture is a still, so it says nothing about how the bridges move; software rendering says nothing about a GPU or about speed. MSVC compiled it first time.
 > Try it on a spare layer before you put it in a show.
 >
 > This codebase was created with AI assistance, directed and reviewed by a human author.
@@ -201,7 +201,10 @@ jump among near-ties from frame to frame. So a bridge from the last frame is kep
 nearest where it was, while it is no more than one lattice cell longer than the shortest. On a
 still clip the bridges hold still. On a moving one they hold still **in the frame** until they
 fall too far behind, then step: on a slow pan the harness measured 1–7% of bridges changing from
-one frame to the next with keeping, against 2–90% without. FILM_PAN_PENDING
+one frame to the next with keeping, against 2–90% without. In the release video's slow pan (one still
+frame of the skulls moved a pixel every two or three frames), 3.9% of the stencil's pixels
+changed from one frame to the next on average, against 10.3% of the source's; that is a
+measurement of the take, not one of the harness's checks.
 
 **Shortest, not strongest.** Every bridge is exactly the shortest gap from its island to another
 piece of sheet (checked against brute force). A real cutter also bridges for strength and would
@@ -216,12 +219,36 @@ give a big island a second bridge; this never does.
 offline harness on an M4 Max, macOS, on a machine shared with other work (so the same run moved
 by up to a factor of two between tries), best of three runs of 30 frames:
 
-PERF_PENDING
+On the harness's bench scene (blobs through letters, about 46 islands, at the defaults: two
+layers), `sntest --bench`, 25 September 2026 in a quieter moment (three runs each):
+
+| | 1280 × 720 | 1920 × 1080 | 3840 × 2160 |
+| --- | --- | --- | --- |
+| defaults (2 layers) | 9.5–11.4 ms | 14.9–16.3 ms | 15.4–17.0 ms |
+| 1 layer | | 7.8–9.1 ms | |
+| 4 layers | | 31–33 ms | |
+
+At 1080p about 5.6–10 ms of the default is the floods and 4.6–4.9 ms the cutter on the CPU.
+Earlier runs on a busier machine read 13–26 ms at 1080p for the same scene.
+
+On Resolume's own demo clips at 1920 × 1080 (90 frames through `sntest --pipe`, less the
+harness's own frame input and output, about 9 ms a frame, measured by putting the bench scene
+through both ways):
+
+| clip | defaults (2 layers) | 1 layer |
+| --- | --- | --- |
+| the skulls (NoHopeJustFear_44), busy, full frame | about 22 ms | about 12 ms |
+| the tumbling sphere (Metalive 01) | about 14 ms | about 7 ms |
+| three rings (Trinity_09) | about 9 ms | about 5 ms |
+
+A 60 fps frame is 16.7 ms, so on a busy clip at 1080p the defaults take **more than a whole
+frame**, and on a simple one about half. The cost does not grow past 1080p (the lattice stops at
+540 rows), but it grows with every layer and every island.
 
 **To make it cheaper:**
 
 - **Fewer layers.** Each layer is its own cut and its own floods; one layer costs about half
-  what two do.
+  what two do (measured above).
 - **A smaller lattice.** The lattice is at most 540 rows, so 1080p and 4K cut at 960 × 540. On a
   720p layer or composition the lattice is 640 × 360, well under half the cells.
 - **Fewer islands.** More Smooth and a larger Min Island mean fewer islands, fewer bridges and
@@ -275,7 +302,7 @@ It records the GL vendor, renderer and version at load, and which shader failed 
 
 ## Known limits
 
-- **Heavy.** See Performance: most of a 60 fps frame at 1080p on a busy clip.
+- **Heavy.** See Performance: more than a 60 fps frame at 1080p on a busy clip at the defaults.
 - **The lattice stops at 540 rows**, so at 4K every texel is four pixels and, with the spray at
   its sharpest, the edges step.
 - **One bridge per island per pass, always the shortest.** No second bridge for strength; a big
@@ -285,14 +312,24 @@ It records the GL vendor, renderer and version at load, and which shader failed 
 - **The drips are static**, not running over time.
 - **Lift, the drips, the walls and the palettes are chosen to look right**, not measured against
   anything.
-- **FILM_LIMITS_PENDING**
+- **What filming the release video found**, on Resolume's demo clips through the harness:
+  a bright subject on black or on transparency (the fire of Ethnik2_23) paints nothing at the
+  defaults, because dark is paint; with Invert on at the default Threshold most of the dark
+  demo loops paint only their brightest specks, so raise Threshold with it; and at the default
+  Pressure (1.12, over the wall's 0.9) a fringe of drips hangs from the lower edges of
+  solid paint (18% of columns run), rather than a few runs — lower Pressure under 0.9 or Drips to 0 for
+  clean edges.
 - **Never loaded into Resolume on macOS.** Everything numeric was compiled, rendered and measured
   offline against the real plugin class in a headless CGL context, plus an `oxbow` load.
 - **Never seen on camera footage**, only on Resolume's bundled CG loops.
 - **Only ever run on an Apple M4 Max**, although the macOS build contains an Intel slice.
 - **No presets** and no OpenFX version.
 - **There is a browser demo** at [stencil-demo.stoatworks-labs.com](https://stencil-demo.stoatworks-labs.com/).
-  DEMO_PENDING
+  It is a port to a web page, not the plugin: the shaders are the plugin's own, run in WebGL2, jump flood
+  included, but the CPU half — the union-find cutter in `Bridge.cpp` — is a hand port to JavaScript that
+  only a reader checks. It was compared with the C++ once and cut byte-for-byte the same grids (990
+  bridges over 48 random streams, and the page's own frames); the page lists what it does not reproduce
+  (Layers is a menu, there is no About group).
 
 ---
 
