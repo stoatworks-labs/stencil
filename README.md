@@ -26,6 +26,42 @@ Arena and Avenue.
 Resolume. Resolume's bundled demo clip Metalive 01 with three layers of the Street cans on
 the Brick wall.</sub>
 
+<!-- downloads:start -->
+
+## Download
+
+**[v0.1.0](https://github.com/stoatworks-labs/stencil/releases/tag/v0.1.0)** — prebuilt for macOS and Windows. Pick your platform:
+
+<details>
+<summary><b>macOS</b> — Universal (Apple Silicon + Intel)</summary>
+
+| Build | Download | Size |
+| --- | --- | --- |
+| Universal (Apple Silicon + Intel) · .dmg disk image | [`stencil-0.1.0-macos-universal.dmg`](https://github.com/stoatworks-labs/stencil/releases/download/v0.1.0/stencil-0.1.0-macos-universal.dmg) | 270 KB |
+| Universal (Apple Silicon + Intel) · .zip archive | [`stencil-macos-universal.zip`](https://github.com/stoatworks-labs/stencil/releases/latest/download/stencil-macos-universal.zip) | 228 KB |
+
+</details>
+
+<details>
+<summary><b>Windows</b> — x64</summary>
+
+| Build | Download | Size |
+| --- | --- | --- |
+| x64 · .exe installer | [`stencil-0.1.0-windows-x86_64-setup.exe`](https://github.com/stoatworks-labs/stencil/releases/download/v0.1.0/stencil-0.1.0-windows-x86_64-setup.exe) | 238 KB |
+| x64 · .zip archive | [`stencil-windows-x86_64.zip`](https://github.com/stoatworks-labs/stencil/releases/latest/download/stencil-windows-x86_64.zip) | 132 KB |
+
+</details>
+
+All builds, checksums and release notes: [github.com/stoatworks-labs/stencil/releases](https://github.com/stoatworks-labs/stencil/releases).
+
+macOS builds are signed and notarised and open normally. The Windows builds are unsigned, so SmartScreen warns once.
+
+<!-- downloads:end -->
+
+## Video
+
+[![Stencil: spray paint through a cut stencil, for Resolume](docs/video-thumb.png)](https://www.youtube.com/watch?v=T6u7w-wOPwk)
+
 ## The one idea
 
 A stencil is a sheet with holes cut in it, and paint goes through the holes. **A stencil

@@ -48,7 +48,7 @@ Windows  %USERPROFILE%\Documents\Resolume Arena\Extra Effects\
 Avenue uses the same layout under its own folder name. The effect then appears in the effects
 browser as **SW Stencil**.
 
-MACOS_SIGNING_PENDING The Windows download is an x64 installer or a `.zip`. It is not
+The macOS download is a universal build (Apple silicon and Intel), as a `.dmg` or a `.zip`. It is Developer ID-signed and notarised (the downloaded `.dmg` and the bundle inside the `.zip` both read `Notarized Developer ID`), so the bundle simply loads. The Windows download is an x64 installer or a `.zip`. It is not
 code-signed, so the installer trips SmartScreen once: **More info** → **Run anyway**.
 
 ---
