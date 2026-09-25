@@ -17,7 +17,8 @@
 		sntest --width                  bridges have the stated width, and are 4-connected
 		sntest --overspray              the edge profile is the cone's chord fraction
 		sntest --layers                 n layers give n + 1 plateaus, dark over light
-		sntest --stability              bridges translate with the picture; churn on a slow pan
+		sntest --stability              bridges translate with the picture, ties and all
+		sntest --churn                  how often bridges change on a slow sub-pixel pan
 		sntest --resize                 last frame's bridges survive a resize
 		sntest --negative               every GL check above can FAIL
 		sntest --offline                the checks that need no GL (what CI runs)
@@ -777,6 +778,11 @@ void runStability( int width, int height, int perturb, bool quiet )
 		s.end();
 	}
 
+}
+
+/// --churn: (b) above, split out so the negative controls need not run it.
+void runChurn( int width, int height, int perturb, bool quiet )
+{
 	//(b) a slow sub-pixel pan.
 	const double speed = 0.2;//pixels a frame
 	const int frames   = 60;
@@ -788,7 +794,7 @@ void runStability( int width, int height, int perturb, bool quiet )
 		const double free = churnOf( width, height, pictures, perturb | bridge::kPerturbNoHistory, frames, speed, changedFree, totalFree );
 		const bool ok     = kept >= 0.0 && free > 0.0 && kept < free;
 		report( ok, quiet,
-		        "stability: %-18s panned %.1f px a frame for %d frames: churn %.2f%% of bridge-frames (%d frames changed) "
+		        "churn: %-18s panned %.1f px a frame for %d frames: churn %.2f%% of bridge-frames (%d frames changed) "
 		        "keeping last frame's bridges, %.2f%% (%d frames) without",
 		        fixtures::Name( which ), speed, frames, 100.0 * kept, changedKept, 100.0 * free, changedFree );
 	}
@@ -1283,7 +1289,7 @@ int runBench( const std::vector< std::string >& settings, int frames, bool fourK
 	std::printf( "the defaults on the bench scene (blobs through letters), %d frames, best of three runs, after a warm-up, "
 	             "glFinish both sides\n\n",
 	             frames );
-	std::printf( "resolution  lattice    ms/frame   detect  flood   cutter  paint   passes  islands  bridges\n" );
+	std::printf( "resolution  lattice    ms/frame   detect  flood   cutter  paint   passes  islands  bridges  label ms\n" );
 	for( const Size& size : sizes )
 	{
 		Session s;
@@ -1326,14 +1332,29 @@ int runBench( const std::vector< std::string >& settings, int frames, bool fourK
 			islands += s.plugin.CutForTest( layer ).islands;
 			bridges += static_cast< int >( s.plugin.CutForTest( layer ).bridges.size() );
 		}
-		std::printf( "%s   %4dx%-4d  %7.3f   %6.3f  %6.3f  %6.3f  %6.3f  %4d    %5d    %5d\n", size.name,
+		//The labelling alone: union-find over the first layer's grid, best
+		//of twenty.
+		double labelBest = 1e9;
+		{
+			const bridge::Grid& g = s.plugin.GridForTest( 1 );
+			std::vector< uint32_t > labels;
+			uint32_t anchor = 0;
+			for( int run = 0; run < 20; ++run )
+			{
+				const auto start = std::chrono::steady_clock::now();
+				bridge::Label( g, labels, anchor );
+				labelBest = std::min( labelBest, std::chrono::duration< double, std::milli >( std::chrono::steady_clock::now() - start ).count() );
+			}
+		}
+		std::printf( "%s   %4dx%-4d  %7.3f   %6.3f  %6.3f  %6.3f  %6.3f  %4d    %5d    %5d     %6.3f\n", size.name,
 		             s.plugin.LatticeWidthForTest(), s.plugin.LatticeHeightForTest(), best, t.detect, t.flood, t.cutter,
-		             t.paint, t.passes, islands, bridges );
+		             t.paint, t.passes, islands, bridges, labelBest );
 		s.end();
 	}
 	std::printf( "\ndetect = detect + smooth + the tone's readback; flood = every flood pass of every layer, with its label\n"
 	             "upload and seed readback (GPU, and the stall); cutter = labelling, choosing and cutting on the CPU;\n"
-	             "paint = spray, creep, settle and the composite. The stage times are the best of ten frames each.\n" );
+	             "paint = spray, creep, settle and the composite; label = one union-find labelling of one layer's grid\n"
+	             "on the CPU (part of cutter). The stage times are the best of ten frames each.\n" );
 	return 0;
 }
 
@@ -1463,7 +1484,8 @@ void usage()
 		"  --width             bridges have the stated width, and are 4-connected\n"
 		"  --overspray         the edge profile is the cone's chord fraction; width 0.808 R\n"
 		"  --layers            n layers give n + 1 plateaus, darkest ink first\n"
-		"  --stability         bridges translate with the picture; churn on a slow pan\n"
+		"  --stability         bridges translate with the picture, ties and all\n"
+		"  --churn             how often bridges change on a slow sub-pixel pan, kept and not\n"
 		"  --resize            last frame's bridges survive a resize\n"
 		"  --negative          every check above can fail\n"
 		"  --perturb BITS      run the checks verbosely against a perturbed model (bits in Bridge.h, Stencil.h)\n"
@@ -1521,7 +1543,7 @@ int main( int argc, char** argv )
 	std::vector< std::string > checks;
 
 	const std::set< std::string > rendered = { "--islands", "--shortest", "--width", "--overspray", "--layers",
-		                                       "--stability", "--resize", "--negative" };
+		                                       "--stability", "--churn", "--resize", "--negative" };
 	const std::set< std::string > offline  = { "--names", "--exact", "--cutter", "--band", "--footprint", "--offline" };
 
 	for( int i = 1; i < argc; ++i )
@@ -1647,6 +1669,8 @@ int main( int argc, char** argv )
 						runLayers( width, height, perturb, false );
 					else if( check == "--stability" )
 						runStability( width, height, perturb, false );
+					else if( check == "--churn" )
+						runChurn( width, height, perturb, false );
 					else if( check == "--resize" )
 						runResize( width, height, perturb, false );
 					else if( check == "--negative" )

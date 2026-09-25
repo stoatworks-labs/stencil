@@ -29,7 +29,8 @@
 #                   --width      bridges the stated width, and 4-connected
 #                   --overspray  the edge profile the cone's chord fraction
 #                   --layers     n layers, n + 1 plateaus, dark over light
-#                   --stability  bridges translate with the picture; slow-pan churn
+#                   --stability  bridges translate with the picture, ties and all
+#                   --churn      how often bridges change on a slow sub-pixel pan
 #                   --resize     last frame's bridges survive a resize
 #                   --negative   every one of those FAILS on a perturbed model
 #                 and again on Apple's SOFTWARE renderer (CI's), which is not
@@ -125,9 +126,11 @@ rm -rf "$dir"
 
 # The Windows traps the addendum lists, in the C++: M_PI (MSVC has none) and
 # far/near as identifiers (windef.h macros).
-if grep -nwE 'M_PI|far|near' source/*.cpp source/*.h | grep -v '^\S*:[0-9]*:\s*//' | grep -vE '//.*\b(far|near)\b' >/dev/null; then
+# Lines where the word is in a // comment are not code.
+msvc=$( grep -nwE 'M_PI|far|near' source/*.cpp source/*.h | grep -vE '//.*\b(far|near)\b' || true )
+if [ -n "$msvc" ]; then
 	fail "M_PI, far or near in source/ -- MSVC has no M_PI, and windef.h makes far and near macros:"
-	grep -nwE 'M_PI|far|near' source/*.cpp source/*.h | grep -vE '//.*\b(far|near)\b' | sed 's/^/      /'
+	printf '%s\n' "$msvc" | sed 's/^/      /'
 else
 	pass "no M_PI, far or near in source/ (MSVC)"
 fi
@@ -140,7 +143,7 @@ else
 	printf '%s\n' "$out" | sed 's/^/      /'
 fi
 
-GLCHECKS="islands shortest width overspray layers stability resize negative"
+GLCHECKS="islands shortest width overspray layers stability churn resize negative"
 for size in 320x180 1280x720; do
 	step "physics at $size"
 	for check in $GLCHECKS; do

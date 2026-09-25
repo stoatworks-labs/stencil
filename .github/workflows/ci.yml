@@ -71,7 +71,7 @@ jobs:
         # Mac.
         timeout-minutes: 40
         run: >
-          ./build/sntest --islands --shortest --width --overspray --layers --stability --resize --negative
+          ./build/sntest --islands --shortest --width --overspray --layers --stability --churn --resize --negative
           --size 320x180 --allow-no-gl
 
       - name: Controls

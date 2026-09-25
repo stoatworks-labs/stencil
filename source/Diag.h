@@ -20,17 +20,18 @@
 
     **A shader that will not compile.** `InitGL` returns `FF_FAIL` and from
     the operator's side that looks like "the effect does nothing", with no
-    message anywhere; with eight shaders this also records *which* one, which is
+    message anywhere; with seven shaders this also records *which* one, which is
     the difference between a five-minute fix and an afternoon. The GL vendor
     and version strings go in next to it, because a shader that compiles on one
     machine and not on another is a driver answer, not a source answer.
 
-    **A pass buffer that could not be allocated.** This plugin holds seven
-    picture-sized buffers -- the channel and its blur, the flood's two RGBA16UI
-    ping-pong buffers, the field, the cut and the overlay -- and the failure
-    mode when the driver says no is a black frame with nothing to explain it.
-    What goes in the log is the size asked for, because at 4K they come to
-    about 250 MB, 133 MB of it the flood.
+    **A pass buffer that could not be allocated.** This plugin holds eleven
+    buffers, all on the stencil's lattice (at most 540 rows, so at most about
+    960 x 540 whatever the raster) -- the tone and its blur, the labels, the
+    flood's two RGBA16UI ping-pong buffers, the cut, the spray, the creep and
+    its blur, and what landed -- and the failure mode when the driver says no
+    is a black frame with nothing to explain it. What goes in the log is the
+    size asked for; at the largest lattice they come to about 30 MB.
 */
 namespace stencil::diag
 {
