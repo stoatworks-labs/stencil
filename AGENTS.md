@@ -270,12 +270,12 @@ fails `--footprint`.
 
 ### The mutation
 
-One character of the shipped GLSL, on a clean committed tree (see the commit that records
-this file): in the spray shader, `sum += tap.z * step( vec4( 0.75 ), … )` → `0.25`, so a
+One character of the shipped GLSL, on a clean committed tree (f7724e0, and before that on
+48f6ecc's with the same result): in the spray shader, `sum += tap.z * step( vec4( 0.75 ), … )` → `0.25`, so a
 bridge (0.5 in the cut) is sprayed as if it were a hole. Caught by `--islands` (every
 bridged island floats again in the OUTPUT: 6, 4, 6, 22 at 320×180; 6, 4, 6, 23 at 720p)
 and `--width` (0 pixels of sheet across the square ring's bridge, want 1 and 3; 6 and 14
-px at 720p) at both rasters. **Not** caught by `--shortest`, `--stability`, `--churn` or
+px at 720p) at both rasters: 6 of 29 checks at each. **Not** caught by `--shortest`, `--stability`, `--churn` or
 `--resize`, which read the cut grid, not the picture, nor by `--overspray` and `--layers`,
 whose fixtures have no bridges — correctly. It is the check that labels the painted
 output that sees paint where a bridge is. Reverted with `git checkout
