@@ -467,7 +467,8 @@ void runOverspray( int width, int height, int perturb, bool quiet )
 		const double R = controls::FootprintRadiusHeights( controls::DistanceParam( distance ) ) * height / l.k;
 		const size_t taps = spray::Footprint( R ).size();
 		//One conversion into RGBA16F, which GL does not require to round to
-		//nearest -- this renderer truncates -- so one whole ulp of [0.5, 1),
+		//nearest -- this renderer's error came within a hair of a whole ulp,
+		//which only a truncating conversion gives -- so one ulp of [0.5, 1),
 		//2^-11; a float sum of `taps` terms each under 1 (taps x 2^-24); and
 		//the composite and its inversion here (2^-20).
 		const double tolerance = std::ldexp( 1.0, -11 ) + static_cast< double >( taps ) * std::ldexp( 1.0, -24 ) + std::ldexp( 1.0, -20 );
