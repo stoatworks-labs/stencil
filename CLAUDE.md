@@ -78,10 +78,21 @@ footprint or any check's tolerance.
 - macOS build must be universal. Verify with `lipo`, never the build log.
 - FFGL id is `SN01`, display name `SW Stencil`.
 
+## Browser demo
+- `demo/` is stencil-demo.stoatworks-labs.com: the kit from `stoatworks-backend/resolume-demo`
+  (vendored by its `sync.sh`; never edit `demo/vendor/`), the ten shader bodies spliced in
+  by `python3 demo/tools/sync_shaders.py`, held to `Shaders.cpp` by
+  `demo/tools/check_shaders.py` (verify.sh runs it). **A shader or constant change means
+  re-running sync_shaders.py.**
+- `demo/cutter.js` is a hand PORT of `Bridge.cpp`, `demo/controls.js` of Controls.cpp,
+  Palette.cpp's Ink and Spray.cpp: a change to any of those needs the same change there.
+- Deploy: `cf-run npx wrangler deploy` (a Worker **route** + a proxied AAAA 100:: DNS record,
+  not a custom domain); `.github/workflows/deploy.yml` redeploys on a push to main.
+
 ## Not done yet
 - **Never loaded into Resolume.** Everything numeric is measured offline on macOS, plus
   an `oxbow` load.
-- No OpenFX port, no browser demo, no user guide, no factory presets.
+- No OpenFX port, no user guide, no factory presets.
 - `StoatworksAbout.h` and `ATTRIBUTIONS.md` are provisional hand copies (`guide=""`);
   register the project and re-run stoatworks-backend's sync scripts before a release.
 - No GitHub repo; local `main` only.

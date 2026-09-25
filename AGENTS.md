@@ -415,7 +415,7 @@ otherwise.
   against anything.
 - **At k = 3** (1081–1620-row compositions) the output's bilinear weights are thirds, not
   covered by the `--overspray` or `--islands` arguments above, and never run.
-- **No OpenFX port, no browser demo, no user guide, no factory presets.**
+- **No OpenFX port, no user guide, no factory presets.**
 - **The provisional About headers and ATTRIBUTIONS** are hand copies (above).
 
 ---
@@ -436,6 +436,57 @@ otherwise.
   threshold relative to the clip's own tones would flicker unless smoothed over frames.
 
 ---
+
+## The browser demo
+
+`demo/` is the page at **stencil-demo.stoatworks-labs.com** (2026-09-25), on the fleet's kit
+(`stoatworks-backend/resolume-demo`, vendored by its `sync.sh`).
+
+**What is the plugin's.** The version line and all ten GLSL bodies of `Shaders.cpp` (the
+vertex shader, the PCG hash, detect, blur, seed, flood, second, spray, settle, composite)
+are spliced into `demo/plugin.js` by `demo/tools/sync_shaders.py`, tabs and comments
+included; the same script copies the constants of Controls.h, Stencil.h (the lattice, the
+keep slack and radius), Shaders.h and Palette.h, the five palettes and the three option
+lists into `demo/controls.js`. `demo/tools/check_shaders.py` holds all of it to the C++
+character for character (`tools/verify.sh` runs it; one character of the spray shader,
+`kSheetLift` and one wall name each made it fail). **The jump flood is the plugin's own
+flood shader** in WebGL2 on RGBA32UI targets, with `Stencil::flood`'s schedule and region;
+the seconds are read back as RGBA_INTEGER (all WebGL2 promises for an integer target), the
+tone as RGBA/FLOAT, four values a texel with the first kept.
+
+**What is a port, which only a reader checks.** `demo/cutter.js` is `Bridge.cpp` —
+labelling by runs and union-find, the Min Island drop, the passes, each floating piece's
+shortest bridge to any other piece with the (length², a.y, a.x, b.y, b.x) order, the kept
+bridges (nearest the old end within 2 cells, ≤ 1 cell over the shortest, cut first), the
+flood's box after the first pass, the band with its |nₓ| + |n_y| floor. `demo/controls.js`
+is Controls.cpp (in `Math.fround` steps, as the C++ is float; `powf` is `Math.pow` rounded
+once, which may differ in the last bit), Palette.cpp's `Ink` and Spray.cpp. The frame
+sequence in `plugin.js` is `Stencil::ProcessOpenGL`'s. Not ported: the `Perturb` hooks.
+
+**What was measured, once, on this M4 Max (2026-09-25).**
+- **The cutter port against the C++, exact.** A scratch driver linked `Bridge.cpp` and node
+  ran `cutter.js`, both handed the same exact flood (brute force over 4-boundary cells, ties
+  by (y, x)) and carrying last frame's bridges through 0..1 of the lattice as the plugin
+  does. On 48 random streams of 6 frames (noise, rings in rings, discs, letter blocks, 30–110
+  × 20–70, panned up to a cell a frame, bridge widths 0–7.2, Min Island areas 0–30): 288
+  frames, 992 islands, 293 dropped, 990 bridges (794 kept, 142 in a second or third pass)
+  — **the two outputs identical byte for byte**, every bridge, pass count and cell of every
+  cut grid. On 168 layer-frames of the page's own 962 × 542 grids (eight clip and control
+  settings, eight renders each, history carried): 206 bridges, identical again.
+- **The page's WebGL2 flood against exact.** On those 168 layer-frames the page's own
+  output (GPU flood) equals the exact-flood replay: every bridge and every cell.
+- **End to end against the plugin.** The page's input frames through `sntest --pipe`
+  (the real plugin class) against the page's canvas, five first frames at 960 × 540 (the
+  defaults on Lights on black and on the Synthetic scene; four layers From Clip on Brick;
+  Lift 1, Drips 1, Pressure 0.8, Distance 0.5; Min Island 0 over the clip): **0 pixels
+  differ**, on ANGLE on Metal. One machine, a few frames.
+- Loaded headlessly: no console errors; Layers 2 → 1 changed 43,943 of 518,400 pixels;
+  Bridge Width to 2% visibly thickens the bridges.
+
+**Traps.** The kit has no integer control, so Layers is a dropdown of 1–4 (its index + 1).
+The clip list leads with *Lights on black*: bright discs on black are islands in paint, so
+the defaults show bridges at once; the geometry card's rings are thin enough that Min
+Island drops most of them.
 
 ## Siblings
 

@@ -159,7 +159,16 @@ layers or more islands cost more. Before the cutter was reworked it was 33 ms at
 
 - **Never loaded into Resolume**, and never built on Windows.
 - Seen only on six of Resolume's bundled demo clips, never on camera footage.
-- No user guide, no browser demo, no OpenFX port, no factory presets.
+- No user guide, no OpenFX port, no factory presets.
+
+## Try it in your browser
+
+**[stencil-demo.stoatworks-labs.com](https://stencil-demo.stoatworks-labs.com/)** runs the
+plugin's own shaders in WebGL2 — the jump flood that measures every bridge included — on
+generated clips, with the plugin's own controls. It is a demo, not the plugin: the CPU
+half, the union-find cutter in `Bridge.cpp`, is **ported to JavaScript** (`demo/cutter.js`),
+and a port is checked only by a reader and by the one comparison against the C++ recorded
+in [AGENTS.md](AGENTS.md#the-browser-demo). The page says what else it does not do.
 
 ## Build
 
