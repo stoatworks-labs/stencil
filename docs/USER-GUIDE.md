@@ -336,7 +336,8 @@ It records the GL vendor, renderer and version at load, and which shader failed 
 - **Never loaded into Resolume on macOS.** Everything numeric was compiled, rendered and measured
   offline against the real plugin class in a headless CGL context, plus an `oxbow` load.
 - **Never seen on camera footage**, only on Resolume's bundled CG loops.
-- **Only ever run on an Apple M4 Max**, although the macOS build contains an Intel slice.
+- **Only ever run on an Apple M4 Max** on macOS, although the macOS build contains an Intel
+  slice. On Windows, see the note at the top of this guide.
 - **No presets** and no OpenFX version.
 - **There's a browser demo** at [stencil-demo.stoatworks-labs.com](https://stencil-demo.stoatworks-labs.com/).
   It's a port to a web page rather than the plugin: the shaders are the plugin's own, run in
