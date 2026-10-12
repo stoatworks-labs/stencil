@@ -232,7 +232,8 @@ give a big island a second bridge; this never does.
 offline harness on an M4 Max, macOS, on a machine shared with other work (so the same run moved
 by up to a factor of two between tries), best of three runs of 30 frames:
 
-On the harness's bench scene (blobs through letters, about 46 islands, at the defaults: two
+On the harness's bench scene (blobs through letters, 47 islands at 720p and 46 at 1080p, at the
+defaults: two
 layers), `sntest --bench`, 25 September 2026 at a quieter moment (three runs each):
 
 | | 1280 × 720 | 1920 × 1080 | 3840 × 2160 |

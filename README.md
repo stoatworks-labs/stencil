@@ -8,9 +8,10 @@
 > and the width it should be, the overspray across an edge is the shape it should be, the layers
 > stack dark over light, a picture panned by whole cells gets the same bridges moved with it, and
 > a resize keeps last frame's bridges. Each of those checks has a negative control that proves it
-> can fail. It has **never been loaded into Resolume**; it's loaded by
+> can fail. It has **never been loaded into Resolume on macOS**; there it's loaded by
 > [oxbow](https://github.com/stoatworks-labs/oxbow), which is a real FFGL host but isn't
-> Resolume. See [Status](#status).
+> Resolume. On Windows it loads and renders in Arena 7.27.1, on software rendering. See
+> [Status](#status).
 
 Spray paint through a cut stencil, as an FFGL effect for [Resolume](https://resolume.com)
 Arena and Avenue. It cuts the clip into a proper stencil first, with bridges so the middle of
@@ -171,7 +172,8 @@ and 333×187 by hand. Here's what it shows:
   120 frames through it.
 
 Render cost, `sntest --bench` (the defaults on the bench scene of blobs through letters,
-two layers, about 47 islands, best of three runs of 30 frames, `glFinish` both sides). This
+two layers, 47 islands at 720p and 46 at 1080p, best of three runs of 30 frames, `glFinish`
+both sides). This
 Mac was busy with other work throughout (an ffmpeg encode on twelve cores, a VM, other
 plugins' harnesses on the same GPU), so the same bench moved by a factor of two between
 runs; the range is every run of the final build, the best first:
