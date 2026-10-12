@@ -1,35 +1,45 @@
 # Stencil user guide
 
-Stencil is **spray paint through a cut stencil, for [Resolume](https://resolume.com) Arena and
-Avenue**, as an FFGL effect. It is not a posterise filter with a spray texture laid over it. The
-plugin cuts the clip into a real stencil, one sheet per layer, and a stencil cannot hold a
-floating piece: cut out an O and its middle falls out. So every island gets a **bridge**, the
-shortest strip of sheet there is from it to any other piece, and it goes round again until
-nothing floats. Then the paint is sprayed through the holes from a nozzle at a distance. The look
-falls out of that: the gap in the O where its ring is thinnest, islands inside islands all hung
-off the frame, layers sprayed dark over light, a halo in proportion to the nozzle's distance,
-ghostly bridges where the sheet lifts, and drips.
+Stencil is spray paint through a cut stencil, as an FFGL effect for
+[Resolume](https://resolume.com) Arena and Avenue. It cuts the clip into a stencil, one sheet per
+layer, bridges every island so nothing falls out, and sprays paint through the holes.
+
+There's no posterise filter or spray texture involved. A stencil can't hold a floating piece: cut
+out an O and its middle falls out. So every island gets a **bridge**, the shortest strip of sheet
+there is from it to any other piece, and the plugin goes round again until nothing floats. Then
+the paint is sprayed through the holes from a nozzle at a distance. The look falls out of that:
+the gap in the O where its ring is thinnest, islands inside islands all hung off the frame, layers
+sprayed dark over light, a halo in proportion to the nozzle's distance, ghostly bridges where the
+sheet lifts, and drips.
 
 ![Resolume's demo clip Metalive 01 as a three-layer stencil on a brick wall: a tumbling mass of golden plates cut into cream, red and black, the black split by thin bridges, paint dripping from its lower edges](hero.png)
 
 *Resolume's bundled demo clip Metalive 01 through the plugin with three layers of the Street cans
 on the Brick wall, rendered by the offline harness rather than captured from Resolume.*
 
-> **Before you rely on this:** released at **v0.1.0**, and honestly early. The stencil is
-> measured rather than asserted, by a harness that drives the real plugin class headlessly and
-> reads every property back out of the picture it renders, at two rasters and on a software
-> renderer: after bridging, a flood fill of the output finds no piece of sheet cut off from the
-> frame, on letters, rings nested four deep, squares in squares and random blobs; every bridge is
-> exactly the shortest gap from its island to another piece, against brute force; a bridge is
-> exactly the stated width and stays 4-connected; the paint across a straight edge is the chord
-> fraction of the nozzle's disc to within one half-float step; n layers give n + 1 tones, darkest
-> on top; a picture panned by whole cells gets the same bridges moved with it; and a resize keeps
-> last frame's bridges. Nine deliberately broken models are each shown to fail their check, and
-> all 14 controls are shown to change the picture. It is **heavy for a VJ effect** (see
-> Performance). It has **never been loaded into Resolume on macOS** — the one host it has run in
-> there is the fleet's own test host, `oxbow`, for 120 frames.
-> On Windows it has: the DLL release.yml built from this source loads in Resolume Arena 7.27.1 on software rendering (win-lab, Mesa llvmpipe, no GPU), registers as `SW Stencil` / `SN01` / effect, all 20 host controls match what the plugin declares, it renders, Arena's log stays clean, and all 14 valued controls and Arena's own Opacity move the picture (against a noise floor of 0; Bridge Width and Min Island only just, at 0.25 and 0.30 levels, on the gate's small thumbnail): 9 of the fleet Arena gate's 9 checks, one run. The gate's picture is a still, so it says nothing about how the bridges move; software rendering says nothing about a GPU or about speed. MSVC compiled it first time.
-> Try it on a spare layer before you put it in a show.
+> **Before you rely on this:** this is **v0.1.0**, and it's still early days. The stencil is
+> measured rather than asserted, by a harness that drives the real plugin class without a window
+> and reads every property back out of the picture it renders, at two rasters and on a software
+> renderer. After bridging, a flood fill of the output finds no piece of sheet cut off from the
+> frame, on letters, rings nested four deep, squares in squares and random blobs. Every bridge is
+> exactly the shortest gap from its island to another piece, checked against brute force, and a
+> bridge is exactly the stated width and stays 4-connected. The paint across a straight edge is
+> the chord fraction of the nozzle's disc to within one half-float step, n layers give n + 1
+> tones with the darkest on top, a picture panned by whole cells gets the same bridges moved with
+> it, and a resize keeps last frame's bridges. Nine models, broken on purpose, are each shown to
+> fail their check, and all 14 controls are shown to change the picture. It's **heavy for a VJ
+> effect** (see Performance). It has **never been loaded into Resolume on macOS**: the one host
+> it's run in there is the fleet's own test host, `oxbow`, for 120 frames.
+>
+> On Windows it has. The DLL release.yml built from this source loads in Resolume Arena 7.27.1 on
+> software rendering (win-lab, Mesa llvmpipe, no GPU), registers as `SW Stencil` / `SN01` /
+> effect, all 20 host controls match what the plugin declares, it renders, Arena's log stays
+> clean, and all 14 valued controls and Arena's own Opacity move the picture (against a noise
+> floor of 0; Bridge Width and Min Island only just, at 0.25 and 0.30 levels, on the gate's small
+> thumbnail). That's 9 of the fleet Arena gate's 9 checks, in one run. The gate's picture is a
+> still, so it says nothing about how the bridges move, and software rendering says nothing about
+> a GPU or about speed. MSVC compiled it first time. Try it on a spare layer before you put it in
+> a show.
 >
 > This codebase was created with AI assistance, directed and reviewed by a human author.
 
@@ -45,18 +55,21 @@ macOS    ~/Documents/Resolume Arena/Extra Effects/
 Windows  %USERPROFILE%\Documents\Resolume Arena\Extra Effects\
 ```
 
-Avenue uses the same layout under its own folder name. The effect then appears in the effects
+Avenue uses the same layout under its own folder name. The effect then shows up in the effects
 browser as **SW Stencil**.
 
-The macOS download is a universal build (Apple silicon and Intel), as a `.dmg` or a `.zip`. It is Developer ID-signed and notarised (the downloaded `.dmg` and the bundle inside the `.zip` both read `Notarized Developer ID`), so the bundle simply loads. The Windows download is an x64 installer or a `.zip`. It is not
-code-signed, so the installer trips SmartScreen once: **More info** → **Run anyway**.
+The macOS download is a universal build (Apple silicon and Intel), as a `.dmg` or a `.zip`. It's
+Developer ID-signed and notarised (the downloaded `.dmg` and the bundle inside the `.zip` both
+read `Notarized Developer ID`), so the bundle just loads. The Windows download is an x64
+installer or a `.zip`. It isn't code-signed, so the installer trips SmartScreen once:
+**More info** → **Run anyway**.
 
 ---
 
 ## How a stencil is cut
 
 A stencil is a sheet with holes in it, and paint goes through the holes. Anything cut out
-completely — the middle of an O, the counter of an A, an island of light inside a shadow — falls
+completely (the middle of an O, the counter of an A, an island of light inside a shadow) falls
 out. So a stencil cutter leaves **bridges**: thin strips of sheet that tie every island to the
 rest. The plugin does the same:
 
@@ -70,7 +83,7 @@ rest. The plugin does the same:
 | paint under a sheet that does not lie flat, most under a bridge | **ghostly bridges** when Lift is up |
 | paint over what the wall can hold runs down | **drips** from the lower edges |
 
-The tone that is cut is the clip's luma laid over white paper, so **dark is paint**: a black
+The tone that's cut is the clip's luma laid over white paper, so **dark is paint**: a black
 part of the clip is sprayed, a white part is bare wall, and a **transparent part of the clip is
 always bare wall**, with Invert on or off.
 
@@ -93,9 +106,9 @@ Then:
    wall.
 4. **Distance → up.** The nozzle moves back and the halo across every edge widens.
 5. **Lift → 1.** Paint creeps under the sheet; the bridges, which lift most, go ghostly.
-6. **Bridge Width → up.** Thicker ties; at the top they are 2% of the frame high.
-7. **Invert on.** Paint the light instead of the dark — the answer for a bright subject on black
-   or on transparency, which otherwise paints nothing at all.
+6. **Bridge Width → up.** Thicker ties; at the top they're 2% of the frame high.
+7. **Invert on.** Paint the light instead of the dark. That's the answer for a bright subject on
+   black or on transparency, which otherwise paints nothing at all.
 
 Every slider is declared to the host as 0 to 1. The value each position stands for is given with
 each control below. Layers is a whole number, 1 to 4, and Resolume shows it as one.
@@ -111,11 +124,11 @@ everything lighter than Threshold is bare wall. Each layer is cut and bridged on
 **Threshold** (0 to 1, default 0.5). The lightest cut, as a tone. Raise it to paint more of the
 picture; lower it to paint only the darkest parts.
 
-**Invert** (default off). Flips the clip's luma before it is cut, so the light is painted and
-the dark is wall. The paper does not flip: a transparent part of the clip is bare wall either
+**Invert** (default off). Flips the clip's luma before it's cut, so the light is painted and
+the dark is wall. The paper doesn't flip: a transparent part of the clip is bare wall either
 way.
 
-**Smooth** (0 to 1% of the frame height, default 0.3%). A Gaussian blur of the tone before it is
+**Smooth** (0 to 1% of the frame height, default 0.3%). A Gaussian blur of the tone before it's
 cut. More smoothing gives rounder shapes, fewer specks and fewer islands, and so fewer bridges.
 
 **Bridge Width** (0.1% to 2% of the frame height, geometric, default 0.5%, slider 0.537). How
@@ -123,7 +136,7 @@ wide each bridge is cut. A bridge is a straight strip along the shortest gap and
 thinner than it needs to be to stay joined at a diagonal.
 
 **Min Island** (0 to 5% of the frame height, default 1.2%, slider 0.24). An island whose area is
-smaller than this square is not bridged but dropped, as a cutter drops a speck: it falls out and
+smaller than this square isn't bridged but dropped, as a cutter drops a speck: it falls out and
 is painted over.
 
 ---
@@ -136,8 +149,8 @@ the wall. The paint across an edge is the fraction of that disc on the hole's si
 width is in exact proportion to Distance. At 0 the edges are hard, and at 4K they step (see
 Known limits).
 
-**Pressure** (0 to 2, default 1.12, slider 0.56). Paint laid per unit of coverage. Above 0.9 —
-what the wall can hold — the excess runs as drips.
+**Pressure** (0 to 2, default 1.12, slider 0.56). Paint laid per unit of coverage. Above 0.9,
+which is what the wall can hold, the excess runs as drips.
 
 **Lift** (0 to 1, default 0.3). How far the sheet stands off the wall. Paint creeps under every
 edge, over a width up to 0.8% of the frame height, weighted by how lifted the sheet is there: a
@@ -164,15 +177,15 @@ darkest n, so one layer is always the palette's darkest can:
 | Cool | ice, teal, navy, ink |
 
 Every palette's darkest can is a near-black, so with **one layer** the palettes look almost the
-same; they differ from two layers up. The cans are picked by eye.
+same; they differ from two layers up. I picked the cans by eye.
 
 **Layer Colours** (default Palette). **From Clip** paints each layer the clip's own mean colour
 over that layer's band of tone, instead of a can.
 
-**Wall** (default Concrete). What is sprayed on: **Clip** (the clip itself is the wall, and the paint
-lands on it), **Brick** (stretcher bond), **Concrete** (with pits), or **Plain** (off-white).
-Brick, Concrete and Plain cover the whole frame, so the output is opaque at Mix 1. With Clip the
-clip's own alpha is kept where no paint landed, and paint is opaque where it did.
+**Wall** (default Concrete). What's sprayed on: **Clip** (the clip itself is the wall, and the
+paint lands on it), **Brick** (stretcher bond), **Concrete** (with pits), or **Plain**
+(off-white). Brick, Concrete and Plain cover the whole frame, so the output is opaque at Mix 1.
+With Clip the clip's own alpha is kept where no paint landed, and paint is opaque where it did.
 
 **Mix** (0 to 1, default 1). The stencil over the clip.
 
@@ -189,21 +202,21 @@ Six stages a frame:
    the islands under Min Island; then passes of: a jump flood on the GPU finds, for every cell,
    the nearest sheet of a *different* piece; each floating piece takes its shortest bridge; the
    bands are cut. Until nothing floats. An island tied only to another island floats on, so the
-   passes repeat; their number at least halves the floating pieces each time, so they are few.
+   passes repeat; their number at least halves the floating pieces each time, so they're few.
 3. **Spray** (GPU): the holes gathered through the footprint's disc, with exact areas.
 4. **Creep** (GPU): a blur of the holes under the sheet, when Lift is up.
-5. **Settle** (GPU): the paint laid, and the drips run down from where it is over-saturated.
+5. **Settle** (GPU): the paint laid, and the drips run down from where it's over-saturated.
 6. **Composite** (GPU): the wall, then each layer's ink over it, lightest first, back up to the
    output raster.
 
 **Last frame's bridges are kept.** Re-cut from scratch every frame, a bridge on a curve would
 jump among near-ties from frame to frame. So a bridge from the last frame is kept, at the cell
-nearest where it was, while it is no more than one lattice cell longer than the shortest. On a
+nearest where it was, while it's no more than one lattice cell longer than the shortest. On a
 still clip the bridges hold still. On a moving one they hold still **in the frame** until they
 fall too far behind, then step: on a slow pan the harness measured 1–7% of bridges changing from
-one frame to the next with keeping, against 2–90% without. In the release video's slow pan (one still
-frame of the skulls moved a pixel every two or three frames), 3.9% of the stencil's pixels
-changed from one frame to the next on average, against 10.3% of the source's; that is a
+one frame to the next with keeping, against 2–90% without. In the release video's slow pan (one
+still frame of the skulls moved a pixel every two or three frames), 3.9% of the stencil's pixels
+changed from one frame to the next on average, against 10.3% of the source's. That's a
 measurement of the take, not one of the harness's checks.
 
 **Shortest, not strongest.** Every bridge is exactly the shortest gap from its island to another
@@ -214,13 +227,13 @@ give a big island a second bridge; this never does.
 
 ## Performance
 
-**This is heavy for a VJ effect**, and it is the bridging that costs: the jump floods on the GPU
+**This is heavy for a VJ effect**, and it's the bridging that costs: the jump floods on the GPU
 (every pass of every layer, with a read-back stall) and the cutter on the CPU. Measured by the
 offline harness on an M4 Max, macOS, on a machine shared with other work (so the same run moved
 by up to a factor of two between tries), best of three runs of 30 frames:
 
 On the harness's bench scene (blobs through letters, about 46 islands, at the defaults: two
-layers), `sntest --bench`, 25 September 2026 in a quieter moment (three runs each):
+layers), `sntest --bench`, 25 September 2026 at a quieter moment (three runs each):
 
 | | 1280 × 720 | 1920 × 1080 | 3840 × 2160 |
 | --- | --- | --- | --- |
@@ -242,7 +255,7 @@ through both ways):
 | three rings (Trinity_09) | about 9 ms | about 5 ms |
 
 A 60 fps frame is 16.7 ms, so on a busy clip at 1080p the defaults take **more than a whole
-frame**, and on a simple one about half. The cost does not grow past 1080p (the lattice stops at
+frame**, and on a simple one about half. The cost doesn't grow past 1080p (the lattice stops at
 540 rows), but it grows with every layer and every island.
 
 **To make it cheaper:**
@@ -257,10 +270,10 @@ frame**, and on a simple one about half. The cost does not grow past 1080p (the 
 **Why the default is two layers.** One layer would be the cheaper default, but every palette's
 darkest can is a near-black, so at one layer the Palette control would do almost nothing and the
 stencil would lose its dark-over-light tones. Two layers are the fewest that show what the plugin
-is; one is a click away.
+does; one is a click away.
 
-Nothing was timed inside Resolume, where the read-back is a stall the host waits for, and nothing
-was timed on Windows.
+I haven't timed anything inside Resolume, where the read-back is a stall the host waits for, or
+anything on Windows.
 
 ---
 
@@ -285,11 +298,11 @@ Distance a little to soften them.
 **The clip's transparency is gone.** Brick, Concrete and Plain walls cover the frame. Use Wall →
 Clip, or lower Mix.
 
-**SW Stencil is not in the effects browser.** Check the folder under Installing, and that
+**SW Stencil isn't in the effects browser.** Check the folder under Installing, and that
 Resolume was restarted.
 
-**The effect does nothing at all.** A shader that will not compile looks exactly like that, and
-the real message is in the log:
+**The effect does nothing at all.** A shader that won't compile looks just like that, and the
+actual message is in the log:
 
 ```
 macOS    ~/Library/Logs/stencil/stencil.YYYY-MM-DD.log
@@ -316,20 +329,20 @@ It records the GL vendor, renderer and version at load, and which shader failed 
   a bright subject on black or on transparency (the fire of Ethnik2_23) paints nothing at the
   defaults, because dark is paint; with Invert on at the default Threshold most of the dark
   demo loops paint only their brightest specks, so raise Threshold with it; and at the default
-  Pressure (1.12, over the wall's 0.9) a fringe of drips hangs from the lower edges of
-  solid paint (18% of columns run), rather than a few runs — lower Pressure under 0.9 or Drips to 0 for
-  clean edges.
+  Pressure (1.12, over the wall's 0.9) a fringe of drips hangs from the lower edges of solid
+  paint (18% of columns run), rather than a few runs. Lower Pressure under 0.9, or Drips to 0,
+  for clean edges.
 - **Never loaded into Resolume on macOS.** Everything numeric was compiled, rendered and measured
   offline against the real plugin class in a headless CGL context, plus an `oxbow` load.
 - **Never seen on camera footage**, only on Resolume's bundled CG loops.
 - **Only ever run on an Apple M4 Max**, although the macOS build contains an Intel slice.
 - **No presets** and no OpenFX version.
-- **There is a browser demo** at [stencil-demo.stoatworks-labs.com](https://stencil-demo.stoatworks-labs.com/).
-  It is a port to a web page, not the plugin: the shaders are the plugin's own, run in WebGL2, jump flood
-  included, but the CPU half — the union-find cutter in `Bridge.cpp` — is a hand port to JavaScript that
-  only a reader checks. It was compared with the C++ once and cut byte-for-byte the same grids (990
-  bridges over 48 random streams, and the page's own frames); the page lists what it does not reproduce
-  (Layers is a menu, there is no About group).
+- **There's a browser demo** at [stencil-demo.stoatworks-labs.com](https://stencil-demo.stoatworks-labs.com/).
+  It's a port to a web page rather than the plugin: the shaders are the plugin's own, run in
+  WebGL2, jump flood included, but the CPU half (the union-find cutter in `Bridge.cpp`) is a hand
+  port to JavaScript that only a reader checks. It was compared with the C++ once and cut
+  byte-for-byte the same grids (990 bridges over 48 random streams, and the page's own frames).
+  The page lists what it doesn't reproduce (Layers is a menu, and there's no About group).
 
 ---
 
@@ -341,6 +354,7 @@ the project page, the source on GitHub and the support page in your browser.
 
 ## Reporting something
 
-[github.com/stoatworks-labs/stencil/issues](https://github.com/stoatworks-labs/stencil/issues).
-A screenshot, the Cut and Spray settings, and the composition's resolution and frame rate are
-usually enough. If the effect did nothing, attach the log.
+Open an issue at
+[github.com/stoatworks-labs/stencil/issues](https://github.com/stoatworks-labs/stencil/issues)
+and I'll take a look. A screenshot, the Cut and Spray settings, and the composition's resolution
+and frame rate are usually enough. If the effect did nothing, attach the log.

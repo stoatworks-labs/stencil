@@ -1,28 +1,24 @@
 # stencil
 
 > **AI-assisted project.** This codebase was created with [Claude](https://claude.com/claude-code)
-> (Anthropic), directed and reviewed by a human author. The stencil is not asserted but
-> measured: an offline harness drives the real plugin class in a headless GL context and
-> reads every property back out of what it renders, with geometry of its own — after
-> bridging, a flood-fill labelling of the output finds no piece of sheet cut off from the
-> frame's edge on letters, rings four deep, squares in squares and random blobs; every
-> bridge is exactly the shortest gap from its island to another piece, against brute
-> force over boundary cells; a bridge across a gap is exactly 2⌊W/2⌋ + 1 cells wide
-> square to it, and a thin diagonal one stays 4-connected; the paint across a straight
-> edge is the chord fraction of the nozzle's disc to within one half-float ulp; n layers
-> give n + 1 plateaus in their inks, darkest on top; a picture panned by whole cells gets
-> the same bridges translated; and a resize keeps last frame's bridges — with a negative
-> control that proves each check can fail, all of it at two rasters and on Apple's
-> software renderer. It has **never been loaded into Resolume**; it is loaded by
-> [oxbow](https://github.com/stoatworks-labs/oxbow), which is a real FFGL host and is not
+> (Anthropic), directed and reviewed by a human author. The stencil is measured rather than
+> taken on trust: an offline harness drives the real plugin class in a headless GL context and
+> reads every property back out of what it renders, with geometry of its own, at two rasters and
+> on Apple's software renderer. No island is left floating, every bridge is the shortest there is
+> and the width it should be, the overspray across an edge is the shape it should be, the layers
+> stack dark over light, a picture panned by whole cells gets the same bridges moved with it, and
+> a resize keeps last frame's bridges. Each of those checks has a negative control that proves it
+> can fail. It has **never been loaded into Resolume**; it's loaded by
+> [oxbow](https://github.com/stoatworks-labs/oxbow), which is a real FFGL host but isn't
 > Resolume. See [Status](#status).
 
 Spray paint through a cut stencil, as an FFGL effect for [Resolume](https://resolume.com)
-Arena and Avenue.
+Arena and Avenue. It cuts the clip into a proper stencil first, with bridges so the middle of
+the O doesn't fall out, then sprays paint through it.
 
 ![Resolume's demo clip Metalive 01 as a three-layer stencil on a brick wall: a tumbling mass of golden plates cut into cream, red and black, the black split by thin bridges, paint dripping from its lower edges](docs/hero.png)
 
-<sub>One frame, rendered by `sntest --pipe`, the offline harness — not captured from
+<sub>One frame, rendered by `sntest --pipe`, the offline harness, rather than captured from
 Resolume. Resolume's bundled demo clip Metalive 01 with three layers of the Street cans on
 the Brick wall.</sub>
 
@@ -65,13 +61,13 @@ macOS builds are signed and notarised and open normally. The Windows builds are 
 ## The one idea
 
 A stencil is a sheet with holes cut in it, and paint goes through the holes. **A stencil
-cannot hold a floating piece.** The middle of an O, the counter of an A, an island of
-light inside a shadow — cut them out and they fall out. So a cutter leaves **bridges**,
+can't hold a floating piece.** The middle of an O, the counter of an A, an island of
+light inside a shadow: cut them out and they fall out. So a cutter leaves **bridges**,
 thin strips of sheet that tie every island to the rest. Then the paint is sprayed from a
 nozzle at a distance, and some of it creeps under the edges of the sheet.
 
 So the clip's tone is cut at one to four thresholds, and each layer's sheet is labelled
-into pieces. Every piece that does not reach the frame's edge is an island, and gets the
+into pieces. Every piece that doesn't reach the frame's edge is an island, and gets the
 shortest bridge there is from it to any other piece, found by a jump flood that carries
 two seeds a texel: the nearest sheet, and the nearest sheet of a *different* piece. An
 island bridged to another island still floats, so it goes round again until nothing does.
@@ -79,19 +75,19 @@ Then the paint is the hole convolved with the nozzle's footprint.
 
 ## What falls out
 
-None of these is drawn. Each is the stencil doing what stencils do:
+Nothing here is drawn on. Each one is the stencil doing what stencils do:
 
 - **The gap in the O.** Every enclosed shape is broken where its ring is thinnest, because
-  that is where the shortest bridge is — the split letters, the segmented shadows, the
+  that's where the shortest bridge is: the split letters, the segmented shadows, the
   rings of a target with one spoke each.
 - **Islands inside islands.** A ring inside a ring inside a ring: each one is tied to its
-  nearest neighbour, and pieces that were only tied to each other are tied on again, until
+  nearest neighbour, and pieces that were only tied to each other get tied on again, until
   everything hangs off the frame.
 - **Layers, dark over light.** Each layer is its own stencil, sprayed lightest first, so
   the darker cuts land on top and n layers give n + 1 tones including the bare wall. Each
   layer has its own bridges, and a dark layer's bridge shows the lighter paint beneath it.
 - **The halo.** A nozzle further away sprays a wider cone, so the paint fades across every
-  edge over a distance in proportion to it — the fraction of a disc on one side of a line.
+  edge over a distance in proportion to it (the fraction of a disc on one side of a line).
 - **Creep under lifted sheet.** A stencil never lies quite flat. Paint gets under every
   edge a little and under a bridge most, because a bridge is a thin strip that lifts, so
   bridges read as ghostly lines rather than clean gaps when Lift is up.
@@ -102,11 +98,11 @@ None of these is drawn. Each is the stencil doing what stencils do:
 
 The stencil is cut on a lattice of at most 540 rows (at 4K every texel is four pixels), so
 with the spray at its sharpest the edges step. A bridge is always a straight strip and
-always the shortest; a real cutter also bridges for strength, and would add a second
-bridge to a big island, which this never does. Every island gets exactly one bridge per
-pass. Bridges from the previous frame are kept while they stay within a texel of the
+always the shortest. A real cutter also bridges for strength, and would add a second
+bridge to a big island, which this never does: every island gets one bridge per pass, no
+more. Bridges from the previous frame are kept while they stay within a texel of the
 shortest, so on a still clip they hold still; on a panning clip they hold still in the
-*frame* until they fall behind, then step. The drips are static — they appear with the
+*frame* until they fall behind, then step. The drips are static, appearing with the
 paint rather than running over time. The inks are opaque, never mixed.
 
 ## Controls
@@ -119,25 +115,25 @@ paint rather than running over time. The inks are opaque, never mixed.
 
 The defaults are two layers of the Mono cans on concrete, cut at half tone with a little
 smoothing, bridges half a percent of the frame high, specks under 1.2% dropped, sprayed
-from close in with a little lift and a few drips. Chosen on Resolume's demo clips.
+from close in with a little lift and a few drips. I chose them on Resolume's demo clips.
 
-**Alpha.** A transparent part of the clip is bare wall: it is never painted, with Invert
-on or off. With a brick, concrete or plain wall the output is opaque at Mix 1 — the wall
-covers the whole frame. With Wall set to Clip the clip's own alpha is kept where no paint
-landed, and paint is opaque where it did.
+**Alpha.** A transparent part of the clip is bare wall: it's never painted, with Invert
+on or off. With a brick, concrete or plain wall the output is opaque at Mix 1, because the
+wall covers the whole frame. With Wall set to Clip the clip's own alpha is kept where no
+paint landed, and paint is opaque where it did.
 
 ## Status
 
-**v0.1.0, released 25 September 2026, and honestly early.** There is a
+**v0.1.0, released 25 September 2026, and still early days.** There's a
 [user guide](https://stoatworks-labs.com/software/stencil/guide/) and a
 [project page](https://stoatworks-labs.com/software/stencil/).
 
 ### Measured offline, on macOS
 
-`tools/verify.sh` passes on this machine (M4 Max, macOS 26.4) against a fresh universal
+`tools/verify.sh` passes on this Mac (M4 Max, macOS 26.4) against a fresh universal
 Release build, running every check at 320×180 and 1280×720 and again on Apple's software
 renderer, which is what a GPU-less CI runner has; the geometry checks passed at 1920×1080
-and 333×187 by hand. What it establishes:
+and 333×187 by hand. Here's what it shows:
 
 - **No island floats.** On the letters O A B 8 (6 islands), rings nested four deep (4),
   squares in squares three deep (6) and random blobs (22 at 320×180, 23 at 720p), and
@@ -176,8 +172,8 @@ and 333×187 by hand. What it establishes:
 
 Render cost, `sntest --bench` (the defaults on the bench scene of blobs through letters,
 two layers, about 47 islands, best of three runs of 30 frames, `glFinish` both sides). This
-Mac was busy with other work throughout — an ffmpeg encode on twelve cores, a VM, other
-plugins' harnesses on the same GPU — so the same bench moved by a factor of two between
+Mac was busy with other work throughout (an ffmpeg encode on twelve cores, a VM, other
+plugins' harnesses on the same GPU), so the same bench moved by a factor of two between
 runs; the range is every run of the final build, the best first:
 
 | | lattice | ms/frame | the floods | the cutter (CPU) |
@@ -189,18 +185,18 @@ runs; the range is every run of the final build, the best first:
 The bridging is most of it: the floods (every pass of every layer, with the label upload
 and the readback stall) and the cutter on the CPU. A labelling of one layer on its own is
 0.13 ms at 640×360 and 0.27 ms at 960×540, and the passes after the first flood a quarter
-of a grid. The lattice stops at 540 rows, so 4K costs what 1080p does but the composite.
-This is not cheap: at 1080p it is most of a 60 fps frame even at its best here, and more
-layers or more islands cost more. Before the cutter was reworked it was 33 ms at 1080p.
+of a grid. The lattice stops at 540 rows, so 4K costs what 1080p does, bar the composite.
+It isn't cheap: at 1080p it's most of a 60 fps frame even at its best here, and more
+layers or more islands cost more. Before the cutter's rework it was 33 ms at 1080p.
 
-Measured again for the release on a quieter moment (three runs each): the bench scene at the
+Measured again for the release at a quieter moment (three runs each): the bench scene at the
 defaults 9.5–11.4 ms at 720p, 14.9–16.3 ms at 1080p, 15.4–17.0 ms at 4K; one layer 7.8–9.1 ms
 and four layers 31–33 ms at 1080p. On Resolume's demo clips at 1080p through `--pipe`, less the
 harness's own frame input and output (~9 ms, measured by putting the bench scene through both
 ways): the skulls about 22 ms (one layer about 12), the sphere about 14 (7), three rings about
 9 (5). **The default stays at two layers**: one layer would be cheaper, but every palette's
 darkest can is a near-black, so Palette would do almost nothing and the dark-over-light tones
-would go; the user guide says how to make it cheaper.
+would go. The user guide says how to make it cheaper.
 
 ### In Resolume
 
@@ -219,15 +215,15 @@ software rendering says nothing about speed.
 ## Try it in your browser
 
 **[stencil-demo.stoatworks-labs.com](https://stencil-demo.stoatworks-labs.com/)** runs the
-plugin's own shaders in WebGL2 — the jump flood that measures every bridge included — on
-generated clips, with the plugin's own controls. It is a demo, not the plugin: the CPU
+plugin's own shaders in WebGL2 (the jump flood that measures every bridge included) on
+generated clips, with the plugin's own controls. It's a demo rather than the plugin: the CPU
 half, the union-find cutter in `Bridge.cpp`, is **ported to JavaScript** (`demo/cutter.js`),
 and a port is checked only by a reader and by the one comparison against the C++ recorded
-in [AGENTS.md](AGENTS.md#the-browser-demo). The page says what else it does not do.
+in [AGENTS.md](AGENTS.md#the-browser-demo). The page says what else it doesn't do.
 
 ## Build
 
-Needs CMake 3.15+, a C++17 compiler and the FFGL SDK submodule.
+You'll need CMake 3.15+, a C++17 compiler and the FFGL SDK submodule.
 
 ```sh
 git clone --recurse-submodules https://github.com/stoatworks-labs/stencil
